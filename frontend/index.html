@@ -1,63 +1,12 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sertão Replay</title>
-  <link rel="stylesheet" href="./styles.css" />
-</head>
-<body>
-  <main class="app">
-    <section class="hero">
-      <div>
-        <p class="eyebrow">MVP</p>
-        <h1>Sertão Replay</h1>
-        <p>Controle inicial de replay esportivo com câmera IP, FFmpeg, GStreamer, FastAPI e Arduino Leonardo.</p>
-      </div>
-      <div class="status-card">
-        <span id="apiStatus" class="badge">verificando...</span>
-        <button onclick="checkSystem()">Verificar sistema</button>
-      </div>
-    </section>
-
-    <section class="grid">
-      <div class="card">
-        <h2>Câmeras</h2>
-        <select id="cameraSelect"></select>
-        <button onclick="loadCameras()">Recarregar câmeras</button>
-        <button onclick="showGStreamerPipeline()">Ver pipeline GStreamer</button>
-      </div>
-
-      <div class="card">
-        <h2>Gravação</h2>
-        <button onclick="startRecorder()">Iniciar gravação</button>
-        <button class="danger" onclick="stopRecorder()">Parar gravação</button>
-        <button onclick="recorderStatus()">Status</button>
-      </div>
-
-      <div class="card">
-        <h2>Replay</h2>
-        <div class="replay-buttons">
-          <button onclick="createReplay(10)">Replay 10s</button>
-          <button onclick="createReplay(15)">Replay 15s</button>
-          <button onclick="createReplay(30)">Replay 30s</button>
-        </div>
-        <input id="replayLabel" placeholder="Nome opcional: gol, falta, lance..." />
-      </div>
-
-      <div class="card">
-        <h2>Últimos replays</h2>
-        <button onclick="loadReplays()">Atualizar lista</button>
-        <div id="replays"></div>
-      </div>
-    </section>
-
-    <section class="card log-card">
-      <h2>Log</h2>
-      <pre id="log"></pre>
-    </section>
-  </main>
-
-  <script src="./app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sertao Replay</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

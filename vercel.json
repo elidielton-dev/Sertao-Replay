@@ -6,7 +6,14 @@
       "use": "@vercel/python"
     },
     {
-      "src": "frontend/**",
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
+      "src": "frontend/admin/**",
       "use": "@vercel/static"
     }
   ],
@@ -20,12 +27,16 @@
       "dest": "frontend/admin/index.html"
     },
     {
+      "src": "/admin/(.*)",
+      "dest": "frontend/admin/$1"
+    },
+    {
       "src": "/(.*\\.(?:css|js|png|jpg|jpeg|gif|svg|ico|webp))",
-      "dest": "frontend/$1"
+      "dest": "frontend/dist/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/index.html"
+      "dest": "frontend/dist/index.html"
     }
   ]
 }
