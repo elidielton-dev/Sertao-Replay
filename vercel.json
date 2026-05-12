@@ -16,6 +16,10 @@
       "dest": "api/index.py"
     },
     {
+      "src": "/admin/?",
+      "dest": "frontend/admin/index.html"
+    },
+    {
       "src": "/(.*\\.(?:css|js|png|jpg|jpeg|gif|svg|ico|webp))",
       "dest": "frontend/$1"
     },
