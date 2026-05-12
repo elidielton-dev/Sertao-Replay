@@ -7,6 +7,15 @@ function log(message, data = null) {
   logEl.textContent = `[${time}] ${message}${payload}\n\n` + logEl.textContent;
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 async function request(path, options = {}) {
   const response = await fetch(`${api}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -45,15 +54,20 @@ async function loadAdminCameras() {
     }
 
     cameras.forEach((camera) => {
-      const item = document.createElement("button");
-      item.type = "button";
+      const item = document.createElement("div");
       item.className = "camera-admin-item";
-      item.onclick = () => fillCameraForm(camera);
       item.innerHTML = `
-        <strong>${camera.name}</strong>
-        <small>${camera.id} - ${camera.enabled ? "ativa" : "inativa"}</small>
-        <code>${camera.rtsp_url}</code>
+        <strong>${escapeHtml(camera.name)}</strong>
+        <small>${escapeHtml(camera.id)} - ${camera.enabled ? "ativa" : "inativa"}</small>
+        <code>${escapeHtml(camera.rtsp_url)}</code>
+        <div class="camera-admin-actions">
+          <button type="button" data-action="edit">Editar</button>
+          <button type="button" class="danger" data-action="delete">Remover</button>
+        </div>
       `;
+
+      item.querySelector('[data-action="edit"]').addEventListener("click", () => fillCameraForm(camera));
+      item.querySelector('[data-action="delete"]').addEventListener("click", () => deleteCamera(camera.id));
       root.appendChild(item);
     });
 
@@ -68,6 +82,12 @@ function fillCameraForm(camera) {
   document.getElementById("cameraName").value = camera.name;
   document.getElementById("cameraRtsp").value = camera.rtsp_url;
   document.getElementById("cameraEnabled").checked = camera.enabled;
+}
+
+function clearCameraForm() {
+  document.getElementById("cameraForm").reset();
+  document.getElementById("cameraId").value = "";
+  document.getElementById("cameraEnabled").checked = true;
 }
 
 async function saveCamera(event) {
@@ -89,6 +109,23 @@ async function saveCamera(event) {
     await loadAdminCameras();
   } catch (error) {
     log("Erro ao salvar camera", { error: error.message });
+  }
+}
+
+async function deleteCamera(cameraId) {
+  if (!confirm(`Remover a camera ${cameraId}?`)) {
+    return;
+  }
+
+  try {
+    const data = await request(`/cameras/${encodeURIComponent(cameraId)}`, {
+      method: "DELETE",
+    });
+    log("Camera removida", data);
+    clearCameraForm();
+    await loadAdminCameras();
+  } catch (error) {
+    log("Erro ao remover camera", { error: error.message });
   }
 }
 
