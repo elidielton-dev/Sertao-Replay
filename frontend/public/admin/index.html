@@ -3,26 +3,397 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Configuração de câmeras - Sertão Replay</title>
-  <link rel="stylesheet" href="./admin.css" />
+  <title>Admin - Sertão Replay</title>
+  <style>
+    :root {
+      --bg: #020806;
+      --panel: rgba(12, 24, 18, 0.84);
+      --panel-strong: #101b16;
+      --line: rgba(135, 255, 63, 0.18);
+      --muted: #a6b3ad;
+      --text: #f7fff9;
+      --green: #87ff3f;
+      --green-strong: #35d12c;
+      --danger: #ef5350;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 82% 8%, rgba(135, 255, 63, 0.24), transparent 26rem),
+        radial-gradient(circle at 18% 20%, rgba(30, 108, 55, 0.28), transparent 24rem),
+        linear-gradient(180deg, #020806 0%, #07120d 48%, #020806 100%);
+    }
+
+    .page {
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 48px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 30px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .logo {
+      display: grid;
+      width: 46px;
+      height: 46px;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(135, 255, 63, 0.1);
+      box-shadow: 0 0 30px rgba(135, 255, 63, 0.2);
+    }
+
+    .brand span:last-child {
+      color: var(--green);
+    }
+
+    .navlink {
+      color: var(--green);
+      text-decoration: none;
+      font-weight: 800;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: rgba(135, 255, 63, 0.08);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+      gap: 22px;
+      align-items: stretch;
+      margin-bottom: 22px;
+    }
+
+    .hero-card,
+    .card,
+    .status-card {
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: linear-gradient(145deg, rgba(17, 35, 25, 0.9), rgba(5, 12, 9, 0.9));
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+      backdrop-filter: blur(18px);
+    }
+
+    .hero-card {
+      min-height: 330px;
+      padding: clamp(24px, 5vw, 46px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -70px -100px auto;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      border: 1px solid rgba(135, 255, 63, 0.22);
+      box-shadow: inset 0 0 80px rgba(135, 255, 63, 0.1);
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--green);
+      font-weight: 900;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(2.5rem, 8vw, 5.6rem);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    h1 span,
+    h2 span {
+      color: var(--green);
+    }
+
+    .hero-card p:not(.eyebrow) {
+      max-width: 560px;
+      color: var(--muted);
+      font-size: 1.08rem;
+      line-height: 1.7;
+      margin: 22px 0 0;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .status-card {
+      padding: 24px;
+      display: grid;
+      align-content: space-between;
+      gap: 20px;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .metric {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 16px;
+    }
+
+    .metric strong {
+      display: block;
+      color: var(--green);
+      font-size: 1.65rem;
+      line-height: 1;
+    }
+
+    .metric small {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .badge {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      border-radius: 999px;
+      padding: 9px 13px;
+      background: rgba(135, 255, 63, 0.12);
+      color: var(--green);
+      font-weight: 900;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      gap: 18px;
+    }
+
+    .card {
+      padding: 24px;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 1.45rem;
+    }
+
+    .section-copy {
+      margin: 0 0 20px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    label {
+      display: block;
+      margin: 15px 0 7px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 800;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      border-radius: 16px;
+      padding: 14px 15px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.06);
+      outline: none;
+      font-size: 0.98rem;
+    }
+
+    input:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 0 4px rgba(135, 255, 63, 0.12);
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .check-row input {
+      width: auto;
+      margin: 0;
+    }
+
+    button,
+    .button {
+      display: inline-flex;
+      width: 100%;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 16px;
+      padding: 14px 18px;
+      margin-top: 12px;
+      color: #07120d;
+      background: linear-gradient(135deg, var(--green), var(--green-strong));
+      font-weight: 900;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: 0 16px 40px rgba(135, 255, 63, 0.18);
+    }
+
+    .button.secondary,
+    button.secondary {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--line);
+      box-shadow: none;
+    }
+
+    button.danger {
+      color: white;
+      background: var(--danger);
+      box-shadow: none;
+    }
+
+    .camera-admin-item {
+      margin-top: 12px;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(135, 255, 63, 0.16);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .camera-admin-item strong,
+    .camera-admin-item small,
+    .camera-admin-item code {
+      display: block;
+    }
+
+    .camera-admin-item small {
+      margin-top: 5px;
+      color: var(--muted);
+    }
+
+    .camera-admin-item code {
+      margin-top: 9px;
+      color: var(--green);
+      overflow-wrap: anywhere;
+    }
+
+    .camera-admin-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .log-card {
+      margin-top: 18px;
+    }
+
+    pre {
+      min-height: 170px;
+      max-height: 300px;
+      overflow: auto;
+      color: #d8e6dc;
+      white-space: pre-wrap;
+    }
+
+    @media (max-width: 860px) {
+      .page {
+        width: min(100% - 24px, 560px);
+        padding-top: 18px;
+      }
+
+      .topbar,
+      .hero,
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        align-items: flex-start;
+      }
+
+      .navlink {
+        font-size: 0.86rem;
+      }
+
+      .status-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
 </head>
 <body>
-  <main class="app admin-app">
-    <section class="hero admin-hero">
-      <div>
-        <p class="eyebrow">Admin</p>
-        <h1>Configuração de câmeras</h1>
-        <p>Cadastre e mantenha as câmeras IP usadas pelo replay via RTSP.</p>
+  <main class="page">
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">⚽</span>
+        <span>Sertão</span>
+        <span>Replay</span>
       </div>
-      <div class="status-card">
+      <a class="navlink" href="/">Ver app de replays</a>
+    </header>
+
+    <section class="hero">
+      <div class="hero-card">
+        <p class="eyebrow">Painel admin</p>
+        <h1>Controle suas <span>câmeras</span> de replay.</h1>
+        <p>Configure os campos, cadastre links RTSP e deixe cada câmera pronta para capturar os melhores lances do futebol amador.</p>
+        <div class="hero-actions">
+          <a class="button" href="#cameraForm">Cadastrar câmera</a>
+          <a class="button secondary" href="/teste/">Abrir painel MVP</a>
+        </div>
+      </div>
+
+      <aside class="status-card">
         <span id="apiStatus" class="badge">verificando...</span>
+        <div class="status-grid">
+          <div class="metric"><strong>04</strong><small>campos</small></div>
+          <div class="metric"><strong>RTSP</strong><small>entrada</small></div>
+          <div class="metric"><strong>API</strong><small>FastAPI</small></div>
+          <div class="metric"><strong>24/7</strong><small>buffer</small></div>
+        </div>
         <button onclick="checkAdminHealth()">Verificar API</button>
-      </div>
+      </aside>
     </section>
 
     <section class="grid">
-      <form id="cameraForm" class="card admin-form">
-        <h2>Dados da câmera</h2>
+      <form id="cameraForm" class="card">
+        <p class="eyebrow">Cadastro</p>
+        <h2>Dados da <span>câmera</span></h2>
+        <p class="section-copy">Use um ID curto por campo e cole a URL RTSP completa da câmera.</p>
+
         <label for="cameraId">ID</label>
         <input id="cameraId" placeholder="cam1" required />
 
@@ -42,13 +413,16 @@
       </form>
 
       <section class="card">
-        <h2>Câmeras cadastradas</h2>
+        <p class="eyebrow">Operação</p>
+        <h2>Câmeras <span>cadastradas</span></h2>
+        <p class="section-copy">Edite, remova ou recarregue a lista das câmeras disponíveis para os campos.</p>
         <button onclick="loadAdminCameras()">Recarregar lista</button>
         <div id="adminCameras"></div>
       </section>
     </section>
 
     <section class="card log-card">
+      <p class="eyebrow">Sistema</p>
       <h2>Log</h2>
       <pre id="log"></pre>
     </section>

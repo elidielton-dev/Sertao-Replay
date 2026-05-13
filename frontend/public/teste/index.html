@@ -4,57 +4,482 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sertão Replay - Teste</title>
-  <link rel="stylesheet" href="./teste.css" />
+  <style>
+    :root {
+      --bg: #020806;
+      --panel: rgba(12, 24, 18, 0.84);
+      --line: rgba(135, 255, 63, 0.18);
+      --muted: #a6b3ad;
+      --text: #f7fff9;
+      --green: #87ff3f;
+      --green-strong: #35d12c;
+      --danger: #ef5350;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 75% 6%, rgba(135, 255, 63, 0.22), transparent 27rem),
+        radial-gradient(circle at 12% 22%, rgba(36, 130, 68, 0.3), transparent 24rem),
+        linear-gradient(180deg, #020806 0%, #07120d 48%, #020806 100%);
+    }
+
+    .page {
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 52px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 30px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .logo {
+      display: grid;
+      width: 46px;
+      height: 46px;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(135, 255, 63, 0.1);
+      box-shadow: 0 0 30px rgba(135, 255, 63, 0.2);
+    }
+
+    .brand span:last-child,
+    h1 span,
+    h2 span {
+      color: var(--green);
+    }
+
+    .navlink {
+      color: var(--green);
+      text-decoration: none;
+      font-weight: 800;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: rgba(135, 255, 63, 0.08);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+      gap: 22px;
+      align-items: stretch;
+      margin-bottom: 22px;
+    }
+
+    .hero-card,
+    .visual-card,
+    .card,
+    .status-card {
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: linear-gradient(145deg, rgba(17, 35, 25, 0.9), rgba(5, 12, 9, 0.9));
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+      backdrop-filter: blur(18px);
+    }
+
+    .hero-card {
+      min-height: 390px;
+      padding: clamp(24px, 5vw, 50px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -80px -110px auto;
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      border: 1px solid rgba(135, 255, 63, 0.24);
+      box-shadow: inset 0 0 90px rgba(135, 255, 63, 0.1);
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--green);
+      font-weight: 900;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(2.8rem, 8vw, 6.2rem);
+      line-height: 0.94;
+      letter-spacing: 0;
+    }
+
+    .hero-card p:not(.eyebrow) {
+      max-width: 580px;
+      color: var(--muted);
+      font-size: 1.08rem;
+      line-height: 1.7;
+      margin: 22px 0 0;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    .button,
+    button {
+      display: inline-flex;
+      width: 100%;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 16px;
+      padding: 14px 18px;
+      margin-top: 12px;
+      color: #07120d;
+      background: linear-gradient(135deg, var(--green), var(--green-strong));
+      font-weight: 900;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: 0 16px 40px rgba(135, 255, 63, 0.18);
+    }
+
+    .button {
+      width: auto;
+      min-width: 170px;
+    }
+
+    .button.secondary,
+    button.secondary {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--line);
+      box-shadow: none;
+    }
+
+    button.danger {
+      color: white;
+      background: var(--danger);
+      box-shadow: none;
+    }
+
+    .visual-card {
+      min-height: 390px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+    }
+
+    .field {
+      width: min(100%, 380px);
+      aspect-ratio: 1.45;
+      border: 2px solid rgba(135, 255, 63, 0.6);
+      border-radius: 24px;
+      background:
+        linear-gradient(90deg, transparent 49.5%, rgba(135, 255, 63, 0.45) 49.5%, rgba(135, 255, 63, 0.45) 50.5%, transparent 50.5%),
+        repeating-linear-gradient(90deg, rgba(135, 255, 63, 0.07) 0 52px, rgba(255, 255, 255, 0.02) 52px 104px),
+        linear-gradient(135deg, rgba(29, 115, 59, 0.85), rgba(4, 20, 12, 0.95));
+      position: relative;
+      box-shadow: 0 0 60px rgba(135, 255, 63, 0.18);
+    }
+
+    .field::before,
+    .field::after {
+      content: "";
+      position: absolute;
+      border: 2px solid rgba(135, 255, 63, 0.5);
+    }
+
+    .field::before {
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .field::after {
+      width: 58px;
+      height: 120px;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      border-right: 0;
+      border-radius: 18px 0 0 18px;
+    }
+
+    .play {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      display: grid;
+      width: 96px;
+      height: 96px;
+      place-items: center;
+      border-radius: 50%;
+      color: #07120d;
+      background: var(--green);
+      font-size: 2.2rem;
+      box-shadow: 0 0 50px rgba(135, 255, 63, 0.45);
+      z-index: 2;
+    }
+
+    .feature-grid,
+    .control-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin: 22px 0;
+    }
+
+    .feature {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 20px;
+    }
+
+    .feature strong {
+      display: block;
+      color: var(--green);
+      font-size: 1.6rem;
+      margin-bottom: 8px;
+    }
+
+    .feature p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .section-title {
+      margin: 34px 0 16px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+    }
+
+    .section-title p {
+      max-width: 680px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .card,
+    .status-card {
+      padding: 22px;
+    }
+
+    h2,
+    h3 {
+      margin: 0 0 12px;
+    }
+
+    select,
+    input {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      border-radius: 16px;
+      padding: 14px 15px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.06);
+      outline: none;
+      font-size: 0.98rem;
+    }
+
+    select:focus,
+    input:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 0 4px rgba(135, 255, 63, 0.12);
+    }
+
+    .badge {
+      display: inline-flex;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 9px 13px;
+      background: rgba(135, 255, 63, 0.12);
+      color: var(--green);
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+
+    .replay-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .replay-buttons button {
+      margin-top: 0;
+    }
+
+    .log-card {
+      margin-top: 18px;
+    }
+
+    pre {
+      min-height: 170px;
+      max-height: 300px;
+      overflow: auto;
+      color: #d8e6dc;
+      white-space: pre-wrap;
+    }
+
+    .replay-item {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      margin-top: 10px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .replay-item a {
+      color: var(--green);
+      font-weight: 800;
+    }
+
+    @media (max-width: 900px) {
+      .page {
+        width: min(100% - 24px, 560px);
+        padding-top: 18px;
+      }
+
+      .topbar,
+      .hero,
+      .feature-grid,
+      .control-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        align-items: flex-start;
+      }
+
+      .button {
+        width: 100%;
+      }
+
+      .replay-buttons {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
-  <main class="app">
+  <main class="page">
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">⚽</span>
+        <span>Sertão</span>
+        <span>Replay</span>
+      </div>
+      <a class="navlink" href="/admin/">Configurar câmeras</a>
+    </header>
+
     <section class="hero">
-      <div>
-        <p class="eyebrow">MVP</p>
-        <h1>Sertão Replay</h1>
-        <p>Controle inicial de replay esportivo com câmera IP, FFmpeg, GStreamer, FastAPI e Arduino Leonardo.</p>
+      <div class="hero-card">
+        <p class="eyebrow">Página de teste</p>
+        <h1>Replay esportivo para <span>futebol amador</span>.</h1>
+        <p>Uma home de apresentação para validar câmera, gravação contínua, geração de replays e operação do sistema em campo.</p>
+        <div class="hero-actions">
+          <a class="button" href="#painel">Testar painel</a>
+          <a class="button secondary" href="/">Abrir app mobile</a>
+        </div>
       </div>
-      <div class="status-card">
-        <span id="apiStatus" class="badge">verificando...</span>
-        <button onclick="checkSystem()">Verificar sistema</button>
-      </div>
+
+      <aside class="visual-card">
+        <div class="field">
+          <div class="play">▶</div>
+        </div>
+      </aside>
     </section>
 
-    <section class="grid">
+    <section class="feature-grid">
+      <div class="feature"><strong>RTSP</strong><p>Entrada de câmera IP para captar os lances ao vivo.</p></div>
+      <div class="feature"><strong>FFmpeg</strong><p>Buffer contínuo para gerar cortes dos últimos segundos.</p></div>
+      <div class="feature"><strong>Replay</strong><p>Gols, defesas e jogadas salvos para assistir e compartilhar.</p></div>
+    </section>
+
+    <section id="painel" class="section-title">
+      <p class="eyebrow">MVP original</p>
+      <h2>Painel de <span>controle</span></h2>
+      <p>Esta é a primeira home do sistema, agora com visual de landing page e os controles originais para testes.</p>
+    </section>
+
+    <section class="control-grid">
       <div class="card">
-        <h2>Câmeras</h2>
+        <h3>Câmeras</h3>
         <select id="cameraSelect"></select>
         <button onclick="loadCameras()">Recarregar câmeras</button>
-        <button onclick="showGStreamerPipeline()">Ver pipeline GStreamer</button>
+        <button class="secondary" onclick="showGStreamerPipeline()">Ver pipeline GStreamer</button>
       </div>
 
       <div class="card">
-        <h2>Gravação</h2>
+        <h3>Gravação</h3>
         <button onclick="startRecorder()">Iniciar gravação</button>
         <button class="danger" onclick="stopRecorder()">Parar gravação</button>
-        <button onclick="recorderStatus()">Status</button>
+        <button class="secondary" onclick="recorderStatus()">Status</button>
       </div>
 
       <div class="card">
-        <h2>Replay</h2>
+        <h3>Replay</h3>
         <div class="replay-buttons">
-          <button onclick="createReplay(10)">Replay 10s</button>
-          <button onclick="createReplay(15)">Replay 15s</button>
-          <button onclick="createReplay(30)">Replay 30s</button>
+          <button onclick="createReplay(10)">10s</button>
+          <button onclick="createReplay(15)">15s</button>
+          <button onclick="createReplay(30)">30s</button>
         </div>
         <input id="replayLabel" placeholder="Nome opcional: gol, falta, lance..." />
       </div>
+    </section>
+
+    <section class="control-grid">
+      <div class="status-card">
+        <span id="apiStatus" class="badge">verificando...</span>
+        <h3>Status do sistema</h3>
+        <button onclick="checkSystem()">Verificar sistema</button>
+      </div>
 
       <div class="card">
-        <h2>Últimos replays</h2>
+        <h3>Últimos replays</h3>
         <button onclick="loadReplays()">Atualizar lista</button>
         <div id="replays"></div>
       </div>
-    </section>
 
-    <section class="card log-card">
-      <h2>Log</h2>
-      <pre id="log"></pre>
+      <div class="card log-card">
+        <h3>Log</h3>
+        <pre id="log"></pre>
+      </div>
     </section>
   </main>
 

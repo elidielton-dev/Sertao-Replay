@@ -10,6 +10,22 @@
       "destination": "/api/index.py"
     },
     {
+      "source": "/admin",
+      "destination": "/admin/index.html"
+    },
+    {
+      "source": "/admin/",
+      "destination": "/admin/index.html"
+    },
+    {
+      "source": "/teste",
+      "destination": "/teste/index.html"
+    },
+    {
+      "source": "/teste/",
+      "destination": "/teste/index.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
