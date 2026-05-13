@@ -320,12 +320,32 @@
       margin-top: 18px;
     }
 
+    .inline-log {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      background: rgba(0, 0, 0, 0.22);
+      padding: 14px;
+    }
+
+    .inline-log strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--green);
+    }
+
     pre {
       min-height: 170px;
       max-height: 300px;
       overflow: auto;
       color: #d8e6dc;
       white-space: pre-wrap;
+    }
+
+    .inline-log pre {
+      min-height: 120px;
+      max-height: 190px;
+      margin: 0;
+      font-size: 0.86rem;
     }
 
     @media (max-width: 860px) {
@@ -385,6 +405,10 @@
           <div class="metric"><strong>24/7</strong><small>buffer</small></div>
         </div>
         <button onclick="checkAdminHealth()">Verificar API</button>
+        <div class="inline-log">
+          <strong>Logs do painel</strong>
+          <pre id="log">carregando painel admin...</pre>
+        </div>
       </aside>
     </section>
 
@@ -423,8 +447,8 @@
 
     <section class="card log-card">
       <p class="eyebrow">Sistema</p>
-      <h2>Log</h2>
-      <pre id="log"></pre>
+      <h2>Atividade</h2>
+      <p class="section-copy">Os eventos principais aparecem no painel de logs acima, junto ao status da API.</p>
     </section>
   </main>
 

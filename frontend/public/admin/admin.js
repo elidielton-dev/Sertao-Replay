@@ -2,6 +2,11 @@ const api = "/api";
 
 function log(message, data = null) {
   const logEl = document.getElementById("log");
+  if (!logEl) {
+    console.log(message, data);
+    return;
+  }
+
   const time = new Date().toLocaleTimeString();
   const payload = data ? `\n${JSON.stringify(data, null, 2)}` : "";
   logEl.textContent = `[${time}] ${message}${payload}\n\n` + logEl.textContent;
@@ -50,6 +55,7 @@ async function loadAdminCameras() {
 
     if (!cameras.length) {
       root.innerHTML = '<p class="muted">Nenhuma camera cadastrada.</p>';
+      log("Nenhuma camera cadastrada");
       return;
     }
 
@@ -88,6 +94,7 @@ function clearCameraForm() {
   document.getElementById("cameraForm").reset();
   document.getElementById("cameraId").value = "";
   document.getElementById("cameraEnabled").checked = true;
+  log("Formulario limpo para nova camera");
 }
 
 async function saveCamera(event) {
@@ -129,6 +136,23 @@ async function deleteCamera(cameraId) {
   }
 }
 
-document.getElementById("cameraForm").addEventListener("submit", saveCamera);
-checkAdminHealth();
-loadAdminCameras();
+function initAdminPanel() {
+  log("Painel admin carregado");
+  document.getElementById("cameraForm").addEventListener("submit", saveCamera);
+  checkAdminHealth();
+  loadAdminCameras();
+}
+
+window.addEventListener("error", (event) => {
+  log("Erro de JavaScript no painel admin", { error: event.message });
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  log("Erro assíncrono no painel admin", { error: String(event.reason) });
+});
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initAdminPanel);
+} else {
+  initAdminPanel();
+}
