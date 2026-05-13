@@ -1,5 +1,7 @@
 import subprocess
+from ipaddress import ip_address
 from pathlib import Path
+from urllib.parse import urlparse
 
 from app.core.config import get_settings
 from app.schemas.camera import Camera
@@ -37,7 +39,31 @@ class FFmpegRecorder:
         path.mkdir(parents=True, exist_ok=True)
         return path / f"{camera_id}.jpg"
 
-    def capture_snapshot(self, camera: Camera, timeout_seconds: int = 8) -> dict:
+    def camera_network_hint(self, camera: Camera) -> str:
+        host = urlparse(camera.rtsp_url).hostname
+        default_hint = (
+            "Verifique URL RTSP, usuario, senha, porta, firewall e se o backend "
+            "esta na mesma rede da camera."
+        )
+
+        if not host:
+            return default_hint
+
+        try:
+            address = ip_address(host)
+        except ValueError:
+            return default_hint
+
+        if address.is_private:
+            return (
+                "Esta camera usa IP de rede local. A Vercel nao consegue acessar "
+                "enderecos como 192.168.x.x, 10.x.x.x ou 172.16-31.x.x. Rode o "
+                "backend na mesma rede da camera para testar e visualizar."
+            )
+
+        return default_hint
+
+    def capture_snapshot(self, camera: Camera, timeout_seconds: int = 15) -> dict:
         ffmpeg = self.ffmpeg_command()
         if not ffmpeg:
             return {
@@ -76,6 +102,7 @@ class FFmpegRecorder:
                 "ok": False,
                 "message": f"Tempo esgotado ao conectar na camera {camera.id}.",
                 "camera_id": camera.id,
+                "hint": self.camera_network_hint(camera),
             }
 
         if result.returncode != 0 or not output_path.exists():
@@ -83,6 +110,7 @@ class FFmpegRecorder:
                 "ok": False,
                 "message": f"Nao foi possivel capturar imagem da camera {camera.id}.",
                 "camera_id": camera.id,
+                "hint": self.camera_network_hint(camera),
                 "stderr": result.stderr.strip(),
             }
 

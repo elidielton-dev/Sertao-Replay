@@ -108,13 +108,25 @@ async function testCamera(cameraId) {
     const data = await request(`/cameras/${encodeURIComponent(cameraId)}/test`, {
       method: "POST",
     });
-    log(data.ok ? "Camera testada com sucesso" : "Camera nao respondeu", data);
+    log(data.ok ? "Camera testada com sucesso" : cameraFailureTitle(data), data);
     return data;
   } catch (error) {
     const data = { ok: false, error: error.message };
     log("Erro ao testar camera", data);
     return data;
   }
+}
+
+function cameraFailureTitle(data) {
+  if (data?.hint?.includes("Vercel")) {
+    return "Camera fora do alcance da Vercel";
+  }
+
+  return "Camera nao respondeu";
+}
+
+function cameraFailureText(data) {
+  return data?.hint || data?.message || data?.error || "Nao foi possivel visualizar a camera.";
 }
 
 async function openCameraPreview(camera) {
@@ -130,7 +142,7 @@ async function openCameraPreview(camera) {
 
   const result = await testCamera(camera.id);
   if (!result.ok) {
-    placeholder.textContent = result.message || result.error || "Nao foi possivel visualizar a camera.";
+    placeholder.textContent = cameraFailureText(result);
     return;
   }
 
