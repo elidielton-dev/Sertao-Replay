@@ -311,9 +311,63 @@
 
     .camera-admin-actions {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
       margin-top: 8px;
+    }
+
+    .camera-preview {
+      margin: 16px 0;
+      border: 1px solid rgba(135, 255, 63, 0.18);
+      border-radius: 22px;
+      background: rgba(0, 0, 0, 0.22);
+      padding: 14px;
+    }
+
+    .camera-preview.hidden {
+      display: none;
+    }
+
+    .camera-preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .camera-preview-title {
+      color: var(--green);
+      font-weight: 900;
+    }
+
+    .preview-frame {
+      position: relative;
+      overflow: hidden;
+      min-height: 220px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      background:
+        linear-gradient(135deg, rgba(135, 255, 63, 0.08), transparent),
+        #050a07;
+    }
+
+    .preview-frame img {
+      display: block;
+      width: 100%;
+      min-height: 220px;
+      object-fit: cover;
+    }
+
+    .preview-placeholder {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      color: var(--muted);
+      text-align: center;
+      pointer-events: none;
     }
 
     .log-card {
@@ -370,6 +424,10 @@
 
       .status-grid {
         grid-template-columns: repeat(2, 1fr);
+      }
+
+      .camera-admin-actions {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -441,6 +499,19 @@
         <h2>Câmeras <span>cadastradas</span></h2>
         <p class="section-copy">Edite, remova ou recarregue a lista das câmeras disponíveis para os campos.</p>
         <button onclick="loadAdminCameras()">Recarregar lista</button>
+        <div id="cameraPreview" class="camera-preview hidden">
+          <div class="camera-preview-header">
+            <span id="cameraPreviewTitle" class="camera-preview-title">Visualização da câmera</span>
+            <button type="button" class="secondary" onclick="closeCameraPreview()">Fechar</button>
+          </div>
+          <div class="preview-frame">
+            <img id="cameraPreviewImage" alt="Prévia da câmera selecionada" />
+            <div id="cameraPreviewPlaceholder" class="preview-placeholder">
+              Clique em Visualizar para carregar um snapshot da câmera.
+            </div>
+          </div>
+          <button type="button" onclick="refreshCameraPreview()">Atualizar imagem</button>
+        </div>
         <div id="adminCameras"></div>
       </section>
     </section>

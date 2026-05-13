@@ -3,7 +3,7 @@ from pathlib import Path
 
 from app.core.config import get_settings
 from app.schemas.camera import Camera
-from app.utils.process import ensure_command_exists
+from app.utils.process import resolve_command
 
 
 class FFmpegRecorder:
@@ -21,16 +21,81 @@ class FFmpegRecorder:
         self.settings = get_settings()
         self.processes: dict[str, subprocess.Popen] = {}
 
+    def ffmpeg_command(self) -> str | None:
+        return resolve_command("ffmpeg")
+
     def check_installed(self) -> bool:
-        return ensure_command_exists("ffmpeg")
+        return self.ffmpeg_command() is not None
 
     def camera_buffer_dir(self, camera_id: str) -> Path:
         path = self.settings.buffer_path / camera_id
         path.mkdir(parents=True, exist_ok=True)
         return path
 
+    def snapshot_path(self, camera_id: str) -> Path:
+        path = self.settings.buffer_path / "_snapshots"
+        path.mkdir(parents=True, exist_ok=True)
+        return path / f"{camera_id}.jpg"
+
+    def capture_snapshot(self, camera: Camera, timeout_seconds: int = 8) -> dict:
+        ffmpeg = self.ffmpeg_command()
+        if not ffmpeg:
+            return {
+                "ok": False,
+                "message": "FFmpeg nao encontrado. Instale o FFmpeg ou use imageio-ffmpeg no deploy.",
+            }
+
+        output_path = self.snapshot_path(camera.id)
+        command = [
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-rtsp_transport",
+            "tcp",
+            "-i",
+            camera.rtsp_url,
+            "-frames:v",
+            "1",
+            "-q:v",
+            "3",
+            "-y",
+            str(output_path),
+        ]
+
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=timeout_seconds,
+            )
+        except subprocess.TimeoutExpired:
+            return {
+                "ok": False,
+                "message": f"Tempo esgotado ao conectar na camera {camera.id}.",
+                "camera_id": camera.id,
+            }
+
+        if result.returncode != 0 or not output_path.exists():
+            return {
+                "ok": False,
+                "message": f"Nao foi possivel capturar imagem da camera {camera.id}.",
+                "camera_id": camera.id,
+                "stderr": result.stderr.strip(),
+            }
+
+        return {
+            "ok": True,
+            "message": f"Camera {camera.id} respondeu com imagem.",
+            "camera_id": camera.id,
+            "file_path": str(output_path),
+        }
+
     def start(self, camera: Camera) -> dict:
-        if not self.check_installed():
+        ffmpeg = self.ffmpeg_command()
+        if not ffmpeg:
             return {"ok": False, "message": "FFmpeg não encontrado."}
 
         if camera.id in self.processes and self.processes[camera.id].poll() is None:
@@ -40,7 +105,7 @@ class FFmpegRecorder:
         segment_pattern = str(buffer_dir / "segment_%03d.ts")
 
         command = [
-            "ffmpeg",
+            ffmpeg,
             "-hide_banner",
             "-loglevel",
             "warning",

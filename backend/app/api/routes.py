@@ -1,3 +1,5 @@
+import time
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -81,6 +83,39 @@ def delete_camera(camera_id: str):
         return camera_service.delete_camera(camera_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/cameras/{camera_id}/test")
+def test_camera(camera_id: str):
+    try:
+        camera = camera_service.get_camera(camera_id, include_disabled=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    result = ffmpeg_recorder.capture_snapshot(camera)
+    if result.get("ok"):
+        result["snapshot_url"] = f"/api/cameras/{camera_id}/snapshot?ts={int(time.time())}"
+
+    return result
+
+
+@router.get("/cameras/{camera_id}/snapshot")
+def get_camera_snapshot(camera_id: str):
+    try:
+        camera = camera_service.get_camera(camera_id, include_disabled=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    result = ffmpeg_recorder.capture_snapshot(camera)
+    if not result.get("ok"):
+        raise HTTPException(status_code=502, detail=result)
+
+    return FileResponse(
+        path=result["file_path"],
+        media_type="image/jpeg",
+        filename=f"{camera_id}.jpg",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/cameras/{camera_id}/gstreamer-pipeline")

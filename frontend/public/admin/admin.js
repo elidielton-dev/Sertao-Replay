@@ -1,4 +1,5 @@
 const api = "/api";
+let currentPreviewCameraId = null;
 
 function log(message, data = null) {
   const logEl = document.getElementById("log");
@@ -68,11 +69,15 @@ async function loadAdminCameras() {
         <code>${escapeHtml(camera.rtsp_url)}</code>
         <div class="camera-admin-actions">
           <button type="button" data-action="edit">Editar</button>
+          <button type="button" data-action="test">Testar câmera</button>
+          <button type="button" data-action="preview">Visualizar</button>
           <button type="button" class="danger" data-action="delete">Remover</button>
         </div>
       `;
 
       item.querySelector('[data-action="edit"]').addEventListener("click", () => fillCameraForm(camera));
+      item.querySelector('[data-action="test"]').addEventListener("click", () => testCamera(camera.id));
+      item.querySelector('[data-action="preview"]').addEventListener("click", () => openCameraPreview(camera));
       item.querySelector('[data-action="delete"]').addEventListener("click", () => deleteCamera(camera.id));
       root.appendChild(item);
     });
@@ -95,6 +100,64 @@ function clearCameraForm() {
   document.getElementById("cameraId").value = "";
   document.getElementById("cameraEnabled").checked = true;
   log("Formulario limpo para nova camera");
+}
+
+async function testCamera(cameraId) {
+  try {
+    log(`Testando camera ${cameraId}...`);
+    const data = await request(`/cameras/${encodeURIComponent(cameraId)}/test`, {
+      method: "POST",
+    });
+    log(data.ok ? "Camera testada com sucesso" : "Camera nao respondeu", data);
+    return data;
+  } catch (error) {
+    const data = { ok: false, error: error.message };
+    log("Erro ao testar camera", data);
+    return data;
+  }
+}
+
+async function openCameraPreview(camera) {
+  currentPreviewCameraId = camera.id;
+
+  const preview = document.getElementById("cameraPreview");
+  const title = document.getElementById("cameraPreviewTitle");
+  const placeholder = document.getElementById("cameraPreviewPlaceholder");
+
+  preview.classList.remove("hidden");
+  title.textContent = `Visualizacao: ${camera.name} (${camera.id})`;
+  placeholder.textContent = "Conectando na camera e carregando imagem...";
+
+  const result = await testCamera(camera.id);
+  if (!result.ok) {
+    placeholder.textContent = result.message || result.error || "Nao foi possivel visualizar a camera.";
+    return;
+  }
+
+  refreshCameraPreview();
+}
+
+function refreshCameraPreview() {
+  if (!currentPreviewCameraId) {
+    log("Selecione uma camera para visualizar.");
+    return;
+  }
+
+  const image = document.getElementById("cameraPreviewImage");
+  const placeholder = document.getElementById("cameraPreviewPlaceholder");
+  placeholder.textContent = "Atualizando imagem da camera...";
+  image.removeAttribute("src");
+  image.src = `/api/cameras/${encodeURIComponent(currentPreviewCameraId)}/snapshot?ts=${Date.now()}`;
+  log("Snapshot da camera solicitado", { camera_id: currentPreviewCameraId });
+}
+
+function closeCameraPreview() {
+  currentPreviewCameraId = null;
+  document.getElementById("cameraPreview").classList.add("hidden");
+  document.getElementById("cameraPreviewImage").removeAttribute("src");
+  document.getElementById("cameraPreviewPlaceholder").textContent =
+    "Clique em Visualizar para carregar um snapshot da camera.";
+  log("Visualizacao da camera fechada");
 }
 
 async function saveCamera(event) {
@@ -139,6 +202,16 @@ async function deleteCamera(cameraId) {
 function initAdminPanel() {
   log("Painel admin carregado");
   document.getElementById("cameraForm").addEventListener("submit", saveCamera);
+  const previewImage = document.getElementById("cameraPreviewImage");
+  previewImage.addEventListener("load", () => {
+    document.getElementById("cameraPreviewPlaceholder").textContent = "";
+    log("Imagem da camera carregada", { camera_id: currentPreviewCameraId });
+  });
+  previewImage.addEventListener("error", () => {
+    document.getElementById("cameraPreviewPlaceholder").textContent =
+      "Nao foi possivel carregar a imagem da camera.";
+    log("Erro ao carregar imagem da camera", { camera_id: currentPreviewCameraId });
+  });
   checkAdminHealth();
   loadAdminCameras();
 }
