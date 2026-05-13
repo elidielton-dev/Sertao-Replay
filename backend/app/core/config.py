@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     app_port: int = 8000
 
     database_url: str = "sqlite:///./sports_replay.db"
+    cors_origins: str = "*"
 
     cameras_config_path: str = "../config/cameras.json"
     buffer_root: str = "./storage/buffer"

@@ -334,9 +334,37 @@
       margin-bottom: 12px;
     }
 
+    .api-config {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .api-config label {
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .api-config-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .api-config-row input {
+      min-width: 0;
+    }
+
+    .api-config-row button {
+      width: auto;
+      min-width: 120px;
+      margin-top: 0;
+      white-space: nowrap;
+    }
+
     .replay-buttons {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 10px;
     }
 
@@ -356,6 +384,7 @@
       white-space: pre-wrap;
     }
 
+    .replay-result,
     .replay-item {
       padding: 12px;
       border: 1px solid var(--line);
@@ -364,7 +393,15 @@
       background: rgba(255, 255, 255, 0.04);
     }
 
+    .replay-result:empty {
+      display: none;
+    }
+
+    .replay-result a,
     .replay-item a {
+      display: inline-block;
+      margin-right: 10px;
+      margin-top: 6px;
       color: var(--green);
       font-weight: 800;
     }
@@ -392,6 +429,14 @@
 
       .replay-buttons {
         grid-template-columns: 1fr;
+      }
+
+      .api-config-row {
+        display: grid;
+      }
+
+      .api-config-row button {
+        width: 100%;
       }
     }
   </style>
@@ -458,8 +503,10 @@
           <button onclick="createReplay(10)">10s</button>
           <button onclick="createReplay(15)">15s</button>
           <button onclick="createReplay(30)">30s</button>
+          <button onclick="createReplay(60)">Replay 60s</button>
         </div>
         <input id="replayLabel" placeholder="Nome opcional: gol, falta, lance..." />
+        <div id="replayResult" class="replay-result"></div>
       </div>
     </section>
 
@@ -468,6 +515,13 @@
         <span id="apiStatus" class="badge">verificando...</span>
         <h3>Status do sistema</h3>
         <button onclick="checkSystem()">Verificar sistema</button>
+        <form id="apiConfigForm" class="api-config">
+          <label for="apiBaseUrl">API do backend</label>
+          <div class="api-config-row">
+            <input id="apiBaseUrl" placeholder="/api ou https://seu-backend.com/api" />
+            <button type="submit">Usar API</button>
+          </div>
+        </form>
       </div>
 
       <div class="card">

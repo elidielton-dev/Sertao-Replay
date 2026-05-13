@@ -1,14 +1,54 @@
-const api = "/api";
+const apiStorageKey = "sertao_api_base_url";
+let api = normalizeApiBase(
+  new URLSearchParams(window.location.search).get("api") ||
+    localStorage.getItem(apiStorageKey) ||
+    "/api",
+);
+
+function normalizeApiBase(value) {
+  const cleaned = String(value || "/api").trim() || "/api";
+  return cleaned.endsWith("/") ? cleaned.slice(0, -1) : cleaned;
+}
+
+function apiUrl(path) {
+  return `${api}${path}`;
+}
+
+function replayFileUrl(fileName) {
+  return apiUrl(`/replays/file/${encodeURIComponent(fileName)}`);
+}
+
+function redactRtspText(value) {
+  return String(value).replace(/rtsp:\/\/([^:@/\s]+):([^@/\s]+)@/gi, "rtsp://***:***@");
+}
+
+function redactForLog(value) {
+  if (typeof value === "string") {
+    return redactRtspText(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(redactForLog);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, redactForLog(item)]),
+    );
+  }
+
+  return value;
+}
 
 function log(message, data = null) {
   const logEl = document.getElementById("log");
   const time = new Date().toLocaleTimeString();
-  const payload = data ? `\n${JSON.stringify(data, null, 2)}` : "";
+  const payload = data ? `\n${JSON.stringify(redactForLog(data), null, 2)}` : "";
   logEl.textContent = `[${time}] ${message}${payload}\n\n` + logEl.textContent;
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(`${api}${path}`, {
+  const response = await fetch(apiUrl(path), {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
@@ -20,6 +60,26 @@ async function request(path, options = {}) {
   }
 
   return data;
+}
+
+function initApiConfig() {
+  const form = document.getElementById("apiConfigForm");
+  const input = document.getElementById("apiBaseUrl");
+
+  if (!form || !input) {
+    return;
+  }
+
+  input.value = api;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    api = normalizeApiBase(input.value);
+    localStorage.setItem(apiStorageKey, api);
+    log("API configurada", { api });
+    await checkHealth();
+    await loadCameras();
+    await loadReplays();
+  });
 }
 
 async function checkHealth() {
@@ -113,10 +173,31 @@ async function createReplay(seconds) {
       }),
     });
     log(`Replay ${seconds}s solicitado`, data);
+    renderReplayResult(data);
     await loadReplays();
   } catch (error) {
     log("Erro ao gerar replay", { error: error.message });
   }
+}
+
+function renderReplayResult(data) {
+  const root = document.getElementById("replayResult");
+  if (!root) {
+    return;
+  }
+
+  if (!data?.ok || !data.file_name) {
+    root.innerHTML = `<strong>Replay indisponivel</strong><br /><small>${
+      data?.message || "Inicie a gravacao e tente de novo em alguns segundos."
+    }</small>`;
+    return;
+  }
+
+  root.innerHTML = `
+    <strong>Replay pronto:</strong><br />
+    <small>${data.file_name}</small><br />
+    <a href="${replayFileUrl(data.file_name)}" download>Salvar video no aparelho</a>
+  `;
 }
 
 async function loadReplays() {
@@ -131,7 +212,8 @@ async function loadReplays() {
       item.innerHTML = `
         <strong>${replay.name}</strong><br />
         <small>${replay.size_mb} MB</small><br />
-        <a href="/api/replays/file/${replay.name}" target="_blank">Abrir replay</a>
+        <a href="${replayFileUrl(replay.name)}" target="_blank">Abrir replay</a>
+        <a href="${replayFileUrl(replay.name)}" download>Salvar video</a>
       `;
       root.appendChild(item);
     });
@@ -142,6 +224,7 @@ async function loadReplays() {
   }
 }
 
+initApiConfig();
 checkHealth();
 loadCameras();
 loadReplays();

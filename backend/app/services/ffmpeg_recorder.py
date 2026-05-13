@@ -167,6 +167,9 @@ class FFmpegRecorder:
         buffer_dir = self.camera_buffer_dir(camera.id)
         segment_pattern = str(buffer_dir / "segment_%03d.ts")
 
+        for old_segment in buffer_dir.glob("segment_*.ts"):
+            old_segment.unlink(missing_ok=True)
+
         command = [
             ffmpeg,
             "-hide_banner",
@@ -190,16 +193,18 @@ class FFmpegRecorder:
 
         process = subprocess.Popen(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
         self.processes[camera.id] = process
 
         return {
             "ok": True,
             "message": f"Gravação iniciada para {camera.id}.",
-            "command": " ".join(command),
+            "camera_id": camera.id,
+            "running": True,
+            "segment_time_seconds": self.settings.segment_time_seconds,
+            "buffer_seconds": self.settings.segment_time_seconds * self.settings.segment_wrap_count,
         }
 
     def stop(self, camera_id: str) -> dict:

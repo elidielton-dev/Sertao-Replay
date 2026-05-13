@@ -11,3 +11,5 @@ class ReplayResponse(BaseModel):
     ok: bool
     message: str
     file_path: str | None = None
+    file_name: str | None = None
+    download_url: str | None = None

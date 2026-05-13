@@ -1,5 +1,46 @@
-const api = "/api";
+const apiStorageKey = "sertao_api_base_url";
+let api = normalizeApiBase(
+  new URLSearchParams(window.location.search).get("api") ||
+    localStorage.getItem(apiStorageKey) ||
+    "/api",
+);
 let currentPreviewCameraId = null;
+let previewMonitorTimer = null;
+
+function normalizeApiBase(value) {
+  const cleaned = String(value || "/api").trim() || "/api";
+  return cleaned.endsWith("/") ? cleaned.slice(0, -1) : cleaned;
+}
+
+function apiUrl(path) {
+  return `${api}${path}`;
+}
+
+function replayFileUrl(fileName) {
+  return apiUrl(`/replays/file/${encodeURIComponent(fileName)}`);
+}
+
+function redactRtspText(value) {
+  return String(value).replace(/rtsp:\/\/([^:@/\s]+):([^@/\s]+)@/gi, "rtsp://***:***@");
+}
+
+function redactForLog(value) {
+  if (typeof value === "string") {
+    return redactRtspText(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(redactForLog);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, redactForLog(item)]),
+    );
+  }
+
+  return value;
+}
 
 function log(message, data = null) {
   const logEl = document.getElementById("log");
@@ -9,7 +50,7 @@ function log(message, data = null) {
   }
 
   const time = new Date().toLocaleTimeString();
-  const payload = data ? `\n${JSON.stringify(data, null, 2)}` : "";
+  const payload = data ? `\n${JSON.stringify(redactForLog(data), null, 2)}` : "";
   logEl.textContent = `[${time}] ${message}${payload}\n\n` + logEl.textContent;
 }
 
@@ -23,7 +64,7 @@ function escapeHtml(value) {
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(`${api}${path}`, {
+  const response = await fetch(apiUrl(path), {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
@@ -35,6 +76,27 @@ async function request(path, options = {}) {
   }
 
   return data;
+}
+
+function initApiConfig() {
+  const form = document.getElementById("apiConfigForm");
+  const input = document.getElementById("apiBaseUrl");
+
+  if (!form || !input) {
+    return;
+  }
+
+  input.value = api;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    api = normalizeApiBase(input.value);
+    localStorage.setItem(apiStorageKey, api);
+    log("API configurada", { api });
+    await checkAdminHealth();
+    await loadAdminCameras();
+    await loadRecorderStatus(true);
+    await loadReplays(true);
+  });
 }
 
 async function checkAdminHealth() {
@@ -66,11 +128,14 @@ async function loadAdminCameras() {
       item.innerHTML = `
         <strong>${escapeHtml(camera.name)}</strong>
         <small>${escapeHtml(camera.id)} - ${camera.enabled ? "ativa" : "inativa"}</small>
-        <code>${escapeHtml(camera.rtsp_url)}</code>
+        <code>${escapeHtml(redactRtspText(camera.rtsp_url))}</code>
         <div class="camera-admin-actions">
           <button type="button" data-action="edit">Editar</button>
           <button type="button" data-action="test">Testar câmera</button>
           <button type="button" data-action="preview">Visualizar</button>
+          <button type="button" data-action="start">Monitorar</button>
+          <button type="button" data-action="replay">Replay 60s</button>
+          <button type="button" class="secondary" data-action="stop">Parar</button>
           <button type="button" class="danger" data-action="delete">Remover</button>
         </div>
       `;
@@ -78,6 +143,9 @@ async function loadAdminCameras() {
       item.querySelector('[data-action="edit"]').addEventListener("click", () => fillCameraForm(camera));
       item.querySelector('[data-action="test"]').addEventListener("click", () => testCamera(camera.id));
       item.querySelector('[data-action="preview"]').addEventListener("click", () => openCameraPreview(camera));
+      item.querySelector('[data-action="start"]').addEventListener("click", () => startCameraRecorder(camera.id));
+      item.querySelector('[data-action="replay"]').addEventListener("click", () => createReplay(camera.id, 60));
+      item.querySelector('[data-action="stop"]').addEventListener("click", () => stopCameraRecorder(camera.id));
       item.querySelector('[data-action="delete"]').addEventListener("click", () => deleteCamera(camera.id));
       root.appendChild(item);
     });
@@ -159,11 +227,12 @@ function refreshCameraPreview() {
   const placeholder = document.getElementById("cameraPreviewPlaceholder");
   placeholder.textContent = "Atualizando imagem da camera...";
   image.removeAttribute("src");
-  image.src = `/api/cameras/${encodeURIComponent(currentPreviewCameraId)}/snapshot?ts=${Date.now()}`;
+  image.src = apiUrl(`/cameras/${encodeURIComponent(currentPreviewCameraId)}/snapshot?ts=${Date.now()}`);
   log("Snapshot da camera solicitado", { camera_id: currentPreviewCameraId });
 }
 
 function closeCameraPreview() {
+  stopPreviewMonitor(false);
   currentPreviewCameraId = null;
   document.getElementById("cameraPreview").classList.add("hidden");
   document.getElementById("cameraPreviewImage").removeAttribute("src");
@@ -211,8 +280,172 @@ async function deleteCamera(cameraId) {
   }
 }
 
+async function startCameraRecorder(cameraId) {
+  try {
+    log(`Iniciando monitoramento da camera ${cameraId}...`);
+    const data = await request(`/recorders/${encodeURIComponent(cameraId)}/start`, {
+      method: "POST",
+    });
+    log("Monitoramento iniciado", data);
+    await loadRecorderStatus(true);
+  } catch (error) {
+    log("Erro ao iniciar monitoramento", { error: error.message });
+  }
+}
+
+async function stopCameraRecorder(cameraId) {
+  try {
+    const data = await request(`/recorders/${encodeURIComponent(cameraId)}/stop`, {
+      method: "POST",
+    });
+    log("Monitoramento parado", data);
+    await loadRecorderStatus(true);
+  } catch (error) {
+    log("Erro ao parar monitoramento", { error: error.message });
+  }
+}
+
+async function loadRecorderStatus(silent = false) {
+  try {
+    const data = await request("/recorders/status");
+    const active = Object.entries(data)
+      .filter(([, status]) => status.running)
+      .map(([cameraId]) => cameraId);
+
+    const statusText = active.length
+      ? `Gravando: ${active.join(", ")}`
+      : "Nenhuma camera gravando";
+
+    const statusEl = document.getElementById("recorderStatus");
+    if (statusEl) {
+      statusEl.textContent = statusText;
+    }
+
+    if (!silent) {
+      log("Status do monitoramento", data);
+    }
+  } catch (error) {
+    const statusEl = document.getElementById("recorderStatus");
+    if (statusEl) {
+      statusEl.textContent = "Status indisponivel";
+    }
+    if (!silent) {
+      log("Erro ao verificar monitoramento", { error: error.message });
+    }
+  }
+}
+
+async function createReplay(cameraId, seconds = 60) {
+  try {
+    log(`Gerando replay dos ultimos ${seconds}s da camera ${cameraId}...`);
+    const data = await request("/replay", {
+      method: "POST",
+      body: JSON.stringify({
+        camera_id: cameraId,
+        seconds,
+        label: "botao_replay",
+      }),
+    });
+    log(data.ok ? "Replay pronto para salvar" : "Replay nao gerado", data);
+    renderReplayResult(data);
+    await loadReplays(true);
+  } catch (error) {
+    log("Erro ao gerar replay", { error: error.message });
+  }
+}
+
+function renderReplayResult(data) {
+  const root = document.getElementById("replayResult");
+  if (!root) {
+    return;
+  }
+
+  root.classList.remove("hidden");
+
+  if (!data?.ok || !data.file_name) {
+    root.innerHTML = `<strong>Replay indisponivel</strong><span>${escapeHtml(
+      data?.message || "Inicie o monitoramento e aguarde alguns segundos.",
+    )}</span>`;
+    return;
+  }
+
+  const url = replayFileUrl(data.file_name);
+  root.innerHTML = `
+    <strong>Replay gerado</strong>
+    <span>${escapeHtml(data.file_name)} - ${data.seconds}s</span>
+    <a class="button" href="${url}" download>Salvar video no aparelho</a>
+  `;
+}
+
+async function loadReplays(silent = false) {
+  try {
+    const replays = await request("/replays");
+    const root = document.getElementById("adminReplays");
+
+    if (!root) {
+      return;
+    }
+
+    root.innerHTML = "";
+
+    if (!replays.length) {
+      root.innerHTML = '<p class="muted">Nenhum replay gerado ainda.</p>';
+      return;
+    }
+
+    replays.slice(0, 6).forEach((replay) => {
+      const item = document.createElement("div");
+      item.className = "replay-item";
+      item.innerHTML = `
+        <strong>${escapeHtml(replay.name)}</strong>
+        <small>${replay.size_mb} MB</small>
+        <a href="${replayFileUrl(replay.name)}" download>Salvar video</a>
+      `;
+      root.appendChild(item);
+    });
+
+    if (!silent) {
+      log("Replays carregados", replays);
+    }
+  } catch (error) {
+    if (!silent) {
+      log("Erro ao carregar replays", { error: error.message });
+    }
+  }
+}
+
+function startPreviewMonitor() {
+  if (!currentPreviewCameraId) {
+    log("Selecione uma camera para monitorar a visualizacao.");
+    return;
+  }
+
+  stopPreviewMonitor(false);
+  refreshCameraPreview();
+  previewMonitorTimer = window.setInterval(refreshCameraPreview, 30000);
+  document.getElementById("previewMonitorStatus").textContent = "Monitorando imagem a cada 30s";
+  log("Monitoramento visual iniciado", { camera_id: currentPreviewCameraId });
+}
+
+function stopPreviewMonitor(shouldLog = true) {
+  if (previewMonitorTimer) {
+    window.clearInterval(previewMonitorTimer);
+    previewMonitorTimer = null;
+  }
+
+  const status = document.getElementById("previewMonitorStatus");
+  if (status) {
+    status.textContent = "Atualizacao manual";
+  }
+
+  if (shouldLog) {
+    log("Monitoramento visual parado");
+  }
+}
+
 function initAdminPanel() {
   log("Painel admin carregado");
+  initApiConfig();
   document.getElementById("cameraForm").addEventListener("submit", saveCamera);
   const previewImage = document.getElementById("cameraPreviewImage");
   previewImage.addEventListener("load", () => {
@@ -226,6 +459,9 @@ function initAdminPanel() {
   });
   checkAdminHealth();
   loadAdminCameras();
+  loadRecorderStatus(true);
+  loadReplays(true);
+  window.setInterval(() => loadRecorderStatus(true), 10000);
 }
 
 window.addEventListener("error", (event) => {

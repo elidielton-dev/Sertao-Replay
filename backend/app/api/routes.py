@@ -176,8 +176,11 @@ def list_replays():
 
 @router.get("/replays/file/{filename}")
 def get_replay_file(filename: str):
-    replay_dir = replay_service.settings.replay_path
-    file_path = replay_dir / filename
+    replay_dir = replay_service.settings.replay_path.resolve()
+    file_path = (replay_dir / filename).resolve()
+
+    if replay_dir not in file_path.parents:
+        raise HTTPException(status_code=400, detail="Nome de replay invalido.")
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Replay não encontrado.")

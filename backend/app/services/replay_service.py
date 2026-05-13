@@ -1,9 +1,10 @@
+import re
 import subprocess
 import time
 from pathlib import Path
 
 from app.core.config import get_settings
-from app.utils.process import ensure_command_exists
+from app.utils.process import resolve_command
 
 
 class ReplayService:
@@ -27,19 +28,24 @@ class ReplayService:
         )[-segment_count:]
 
     def create_replay(self, camera_id: str, seconds: int = 15, label: str | None = None) -> dict:
-        if not ensure_command_exists("ffmpeg"):
-            return {"ok": False, "message": "FFmpeg não encontrado.", "file_path": None}
+        ffmpeg = resolve_command("ffmpeg")
+        if not ffmpeg:
+            return {"ok": False, "message": "FFmpeg nao encontrado.", "file_path": None}
 
         segments = self._latest_segments(camera_id, seconds)
         if not segments:
             return {
                 "ok": False,
-                "message": "Nenhum segmento encontrado. Inicie a gravação e aguarde alguns segundos.",
+                "message": "Nenhum segmento encontrado. Inicie a gravacao e aguarde alguns segundos.",
                 "file_path": None,
             }
 
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        safe_label = f"_{label.strip().replace(' ', '_')}" if label else ""
+        safe_label = ""
+        if label:
+            cleaned_label = re.sub(r"[^A-Za-z0-9_-]+", "_", label.strip()).strip("_")
+            safe_label = f"_{cleaned_label}" if cleaned_label else ""
+
         replay_file = self.settings.replay_path / f"{camera_id}_replay_{seconds}s_{timestamp}{safe_label}.mp4"
         replay_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -50,7 +56,7 @@ class ReplayService:
         )
 
         command = [
-            "ffmpeg",
+            ffmpeg,
             "-hide_banner",
             "-y",
             "-f",
@@ -82,6 +88,10 @@ class ReplayService:
             "ok": True,
             "message": "Replay gerado com sucesso.",
             "file_path": str(replay_file),
+            "file_name": replay_file.name,
+            "download_url": f"/api/replays/file/{replay_file.name}",
+            "seconds": seconds,
+            "segments": len(segments),
         }
 
     def list_replays(self) -> list[dict]:
@@ -90,6 +100,7 @@ class ReplayService:
         return [
             {
                 "name": file.name,
+                "download_url": f"/api/replays/file/{file.name}",
                 "path": str(file),
                 "size_mb": round(file.stat().st_size / 1024 / 1024, 2),
                 "created_at": file.stat().st_mtime,
