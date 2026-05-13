@@ -17,7 +17,10 @@ app = FastAPI(
 
 app.include_router(router, prefix="/api")
 
-frontend_path = Path("../frontend").resolve()
+frontend_dist_path = Path("../frontend/dist").resolve()
+frontend_source_path = Path("../frontend").resolve()
+frontend_path = frontend_dist_path if frontend_dist_path.exists() else frontend_source_path
+
 if frontend_path.exists():
     app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
 

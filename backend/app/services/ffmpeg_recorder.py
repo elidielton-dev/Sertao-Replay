@@ -71,54 +71,84 @@ class FFmpegRecorder:
                 "message": "FFmpeg nao encontrado. Instale o FFmpeg ou use imageio-ffmpeg no deploy.",
             }
 
-        output_path = self.snapshot_path(camera.id)
-        command = [
-            ffmpeg,
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-rtsp_transport",
-            "tcp",
-            "-i",
-            camera.rtsp_url,
-            "-frames:v",
-            "1",
-            "-q:v",
-            "3",
-            "-y",
-            str(output_path),
-        ]
+        errors: list[dict[str, str]] = []
 
-        try:
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=timeout_seconds,
+        for transport in (None, "tcp", "udp"):
+            output_path = self.snapshot_path(camera.id)
+            if output_path.exists():
+                output_path.unlink()
+
+            command = [
+                ffmpeg,
+                "-hide_banner",
+                "-loglevel",
+                "error",
+            ]
+
+            if transport:
+                command.extend(["-rtsp_transport", transport])
+
+            command.extend(
+                [
+                    "-i",
+                    camera.rtsp_url,
+                    "-frames:v",
+                    "1",
+                    "-q:v",
+                    "3",
+                    "-y",
+                    str(output_path),
+                ]
             )
-        except subprocess.TimeoutExpired:
-            return {
-                "ok": False,
-                "message": f"Tempo esgotado ao conectar na camera {camera.id}.",
-                "camera_id": camera.id,
-                "hint": self.camera_network_hint(camera),
-            }
 
-        if result.returncode != 0 or not output_path.exists():
-            return {
-                "ok": False,
-                "message": f"Nao foi possivel capturar imagem da camera {camera.id}.",
-                "camera_id": camera.id,
-                "hint": self.camera_network_hint(camera),
-                "stderr": result.stderr.strip(),
-            }
+            try:
+                result = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=timeout_seconds,
+                )
+            except subprocess.TimeoutExpired:
+                errors.append(
+                    {
+                        "transport": transport or "auto",
+                        "stderr": (
+                            "Tempo esgotado usando negociacao automatica de RTSP."
+                            if not transport
+                            else f"Tempo esgotado usando RTSP/{transport.upper()}."
+                        ),
+                    }
+                )
+                continue
+
+            if output_path.exists() and output_path.stat().st_size > 0:
+                return {
+                    "ok": True,
+                    "message": (
+                        f"Camera {camera.id} respondeu com imagem via RTSP automatico."
+                        if not transport
+                        else f"Camera {camera.id} respondeu com imagem via RTSP/{transport.upper()}."
+                    ),
+                    "camera_id": camera.id,
+                    "file_path": str(output_path),
+                    "transport": transport or "auto",
+                    "warning": result.stderr.strip() if result.returncode != 0 else None,
+                }
+
+            errors.append(
+                {
+                    "transport": transport or "auto",
+                    "stderr": result.stderr.strip(),
+                }
+            )
 
         return {
-            "ok": True,
-            "message": f"Camera {camera.id} respondeu com imagem.",
+            "ok": False,
+            "message": f"Nao foi possivel capturar imagem da camera {camera.id}.",
             "camera_id": camera.id,
-            "file_path": str(output_path),
+            "hint": self.camera_network_hint(camera),
+            "attempts": errors,
         }
 
     def start(self, camera: Camera) -> dict:
@@ -137,8 +167,6 @@ class FFmpegRecorder:
             "-hide_banner",
             "-loglevel",
             "warning",
-            "-rtsp_transport",
-            "tcp",
             "-i",
             camera.rtsp_url,
             "-an",
