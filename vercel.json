@@ -32,11 +32,11 @@
     },
     {
       "src": "/(.*\\.(?:css|js|png|jpg|jpeg|gif|svg|ico|webp))",
-      "dest": "frontend/dist/$1"
+      "dest": "/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/dist/index.html"
+      "dest": "/index.html"
     }
   ]
 }
