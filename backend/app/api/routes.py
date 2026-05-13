@@ -39,56 +39,56 @@ def system_check():
 
 
 @router.get("/cameras")
-def list_cameras():
-    return camera_service.list_cameras()
+def list_cameras(db: Session = Depends(get_db)):
+    return camera_service.list_cameras(db)
 
 
 @router.get("/admin/cameras")
-def list_admin_cameras():
-    return camera_service.list_all_cameras()
+def list_admin_cameras(db: Session = Depends(get_db)):
+    return camera_service.list_all_cameras(db)
 
 
 @router.post("/cameras")
-def save_camera(camera: Camera):
-    return camera_service.save_camera(camera)
+def save_camera(camera: Camera, db: Session = Depends(get_db)):
+    return camera_service.save_camera(db, camera)
 
 
 @router.get("/cameras/{camera_id}")
-def get_camera(camera_id: str):
+def get_camera(camera_id: str, db: Session = Depends(get_db)):
     try:
-        return camera_service.get_camera(camera_id, include_disabled=True)
+        return camera_service.get_camera(db, camera_id, include_disabled=True)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.put("/cameras/{camera_id}")
-def update_camera(camera_id: str, camera: Camera):
+def update_camera(camera_id: str, camera: Camera, db: Session = Depends(get_db)):
     if camera.id != camera_id:
         raise HTTPException(status_code=400, detail="URL camera ID must match body camera ID.")
 
-    return camera_service.save_camera(camera)
+    return camera_service.save_camera(db, camera)
 
 
 @router.patch("/cameras/{camera_id}/enabled")
-def set_camera_enabled(camera_id: str, enabled: bool):
+def set_camera_enabled(camera_id: str, enabled: bool, db: Session = Depends(get_db)):
     try:
-        return camera_service.set_camera_enabled(camera_id, enabled)
+        return camera_service.set_camera_enabled(db, camera_id, enabled)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.delete("/cameras/{camera_id}")
-def delete_camera(camera_id: str):
+def delete_camera(camera_id: str, db: Session = Depends(get_db)):
     try:
-        return camera_service.delete_camera(camera_id)
+        return camera_service.delete_camera(db, camera_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/cameras/{camera_id}/test")
-def test_camera(camera_id: str):
+def test_camera(camera_id: str, db: Session = Depends(get_db)):
     try:
-        camera = camera_service.get_camera(camera_id, include_disabled=True)
+        camera = camera_service.get_camera(db, camera_id, include_disabled=True)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -100,9 +100,9 @@ def test_camera(camera_id: str):
 
 
 @router.get("/cameras/{camera_id}/snapshot")
-def get_camera_snapshot(camera_id: str):
+def get_camera_snapshot(camera_id: str, db: Session = Depends(get_db)):
     try:
-        camera = camera_service.get_camera(camera_id, include_disabled=True)
+        camera = camera_service.get_camera(db, camera_id, include_disabled=True)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -119,9 +119,9 @@ def get_camera_snapshot(camera_id: str):
 
 
 @router.get("/cameras/{camera_id}/gstreamer-pipeline")
-def get_gstreamer_pipeline(camera_id: str):
+def get_gstreamer_pipeline(camera_id: str, db: Session = Depends(get_db)):
     try:
-        camera = camera_service.get_camera(camera_id)
+        camera = camera_service.get_camera(db, camera_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -129,9 +129,9 @@ def get_gstreamer_pipeline(camera_id: str):
 
 
 @router.post("/recorders/{camera_id}/start")
-def start_recorder(camera_id: str):
+def start_recorder(camera_id: str, db: Session = Depends(get_db)):
     try:
-        camera = camera_service.get_camera(camera_id)
+        camera = camera_service.get_camera(db, camera_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

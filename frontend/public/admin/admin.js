@@ -187,7 +187,7 @@ async function saveCamera(event) {
       method: "POST",
       body: JSON.stringify(camera),
     });
-    log("Camera salva", data);
+    log("Camera salva no banco de dados", data);
     await loadAdminCameras();
   } catch (error) {
     log("Erro ao salvar camera", { error: error.message });

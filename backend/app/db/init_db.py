@@ -1,4 +1,5 @@
 from app.db.session import Base, engine
+from app.models.camera import CameraConfig  # noqa: F401
 from app.models.event import ReplayEvent  # noqa: F401
 
 
