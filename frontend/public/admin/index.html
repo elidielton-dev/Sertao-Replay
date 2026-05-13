@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configuracao de cameras - Sertao Replay</title>
+  <link rel="stylesheet" href="./admin.css" />
+</head>
+<body>
+  <main class="app admin-app">
+    <section class="hero admin-hero">
+      <div>
+        <p class="eyebrow">Admin</p>
+        <h1>Configuracao de cameras</h1>
+        <p>Cadastre e mantenha as cameras IP usadas pelo replay via RTSP.</p>
+      </div>
+      <div class="status-card">
+        <span id="apiStatus" class="badge">verificando...</span>
+        <button onclick="checkAdminHealth()">Verificar API</button>
+      </div>
+    </section>
+
+    <section class="grid">
+      <form id="cameraForm" class="card admin-form">
+        <h2>Dados da camera</h2>
+        <label for="cameraId">ID</label>
+        <input id="cameraId" placeholder="cam1" required />
+
+        <label for="cameraName">Nome</label>
+        <input id="cameraName" placeholder="Camera Campo 1" required />
+
+        <label for="cameraRtsp">URL RTSP</label>
+        <input id="cameraRtsp" placeholder="rtsp://usuario:senha@192.168.0.100:554/stream1" required />
+
+        <label class="check-row">
+          <input id="cameraEnabled" type="checkbox" checked />
+          <span>Ativa</span>
+        </label>
+
+        <button type="submit">Salvar camera</button>
+        <button type="button" class="secondary" onclick="clearCameraForm()">Nova camera</button>
+      </form>
+
+      <section class="card">
+        <h2>Cameras cadastradas</h2>
+        <button onclick="loadAdminCameras()">Recarregar lista</button>
+        <div id="adminCameras"></div>
+      </section>
+    </section>
+
+    <section class="card log-card">
+      <h2>Log</h2>
+      <pre id="log"></pre>
+    </section>
+  </main>
+
+  <script src="./admin.js"></script>
+</body>
+</html>
