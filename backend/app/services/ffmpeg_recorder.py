@@ -63,7 +63,7 @@ class FFmpegRecorder:
 
         return default_hint
 
-    def capture_snapshot(self, camera: Camera, timeout_seconds: int = 15) -> dict:
+    def capture_snapshot(self, camera: Camera, timeout_seconds: int = 25) -> dict:
         ffmpeg = self.ffmpeg_command()
         if not ffmpeg:
             return {
@@ -92,8 +92,13 @@ class FFmpegRecorder:
                 [
                     "-i",
                     camera.rtsp_url,
-                    "-frames:v",
+                    "-an",
+                    "-vf",
+                    "fps=1",
+                    "-update",
                     "1",
+                    "-frames:v",
+                    "10",
                     "-q:v",
                     "3",
                     "-y",
