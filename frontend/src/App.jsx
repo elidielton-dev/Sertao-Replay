@@ -1,13 +1,18 @@
 import {
   Activity,
   CalendarDays,
+  Camera,
   CheckCircle2,
   Download,
+  FileText,
   Home,
   KeyRound,
   Loader2,
+  Plus,
   RotateCcw,
+  Save,
   Send,
+  Settings,
   Video,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -264,10 +269,16 @@ function OperatorPage() {
   return (
     <main className="operator-shell">
       <header className="operator-topbar">
-        <a className="operator-brand" href="/">
-          <Home size={18} />
-          Home
-        </a>
+        <nav className="operator-nav" aria-label="Navegacao do operador">
+          <a className="operator-brand" href="/">
+            <Home size={18} />
+            Home
+          </a>
+          <a className="operator-brand" href="/admin">
+            <Settings size={18} />
+            Admin
+          </a>
+        </nav>
         <span className={`status-pill status-${apiStatus}`}>
           {apiStatus === "online" ? "API online" : apiStatus === "offline" ? "API offline" : "Verificando API"}
         </span>
@@ -400,7 +411,309 @@ function OperatorPage() {
   );
 }
 
+function AdminPage() {
+  const [token, setToken] = useState(() => localStorage.getItem(OPERATOR_TOKEN_KEY) || "");
+  const [cameras, setCameras] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [apiStatus, setApiStatus] = useState("checking");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("Carregando painel admin...");
+  const [form, setForm] = useState({
+    id: "",
+    name: "",
+    enabled: true,
+    notes: "",
+  });
+
+  function tokenValue() {
+    return token.trim();
+  }
+
+  function updateForm(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function resetForm() {
+    setForm({ id: "", name: "", enabled: true, notes: "" });
+  }
+
+  async function loadCameras() {
+    const data = await apiRequest("/cameras");
+    setCameras(Array.isArray(data) ? data : []);
+  }
+
+  async function loadLogs() {
+    if (!tokenValue()) {
+      setLogs([]);
+      return;
+    }
+
+    const data = await apiRequest("/logs", { token: tokenValue() });
+    setLogs(Array.isArray(data) ? data : []);
+  }
+
+  async function refreshStatus({ silent = false } = {}) {
+    setBusy(true);
+    try {
+      await apiRequest("/health");
+      await Promise.all([loadCameras(), loadLogs()]);
+      setApiStatus("online");
+      if (!silent) {
+        setMessage("Status atualizado.");
+      }
+    } catch (error) {
+      setApiStatus("error");
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    refreshStatus();
+    const timer = window.setInterval(() => refreshStatus({ silent: true }), 10000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  function saveToken(event) {
+    event.preventDefault();
+    if (tokenValue()) {
+      localStorage.setItem(OPERATOR_TOKEN_KEY, tokenValue());
+    } else {
+      localStorage.removeItem(OPERATOR_TOKEN_KEY);
+    }
+    setMessage("Token salvo neste navegador.");
+    refreshStatus();
+  }
+
+  function editCamera(camera) {
+    setForm({
+      id: camera.id,
+      name: camera.name,
+      enabled: Boolean(camera.enabled),
+      notes: camera.notes || "",
+    });
+  }
+
+  async function saveCamera(event) {
+    event.preventDefault();
+    if (!tokenValue()) {
+      setMessage("Informe o token de operador antes de salvar.");
+      return;
+    }
+
+    const payload = {
+      id: form.id.trim(),
+      name: form.name.trim(),
+      enabled: form.enabled,
+      notes: form.notes.trim() || null,
+    };
+
+    setBusy(true);
+    try {
+      const saved = await apiRequest("/cameras", {
+        method: "POST",
+        token: tokenValue(),
+        body: JSON.stringify(payload),
+      });
+      setMessage(`Camera ${saved.id} salva.`);
+      resetForm();
+      await Promise.all([loadCameras(), loadLogs()]);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="operator-shell admin-shell">
+      <header className="operator-topbar">
+        <nav className="operator-nav" aria-label="Navegacao admin">
+          <a className="operator-brand" href="/">
+            <Home size={18} />
+            Home
+          </a>
+          <a className="operator-brand" href="/teste">
+            <Video size={18} />
+            Teste
+          </a>
+        </nav>
+        <span className={`status-pill status-${apiStatus}`}>
+          {apiStatus === "online" ? "API online" : apiStatus === "error" ? "API erro" : "Verificando API"}
+        </span>
+      </header>
+
+      <section className="operator-hero">
+        <div>
+          <p className="eyebrow">Painel admin</p>
+          <h1>Cameras e logs</h1>
+          <p className="header-copy">
+            Cadastre cameras, acompanhe status do capture-server e consulte os logs operacionais.
+          </p>
+        </div>
+      </section>
+
+      <section className="admin-grid">
+        <article className="operator-panel accent-panel">
+          <div className="panel-heading">
+            <Camera size={22} />
+            <div>
+              <h2>Camera</h2>
+              <p>Cadastro usado pelo backend e pela tela de replay.</p>
+            </div>
+          </div>
+
+          <form onSubmit={saveCamera} className="admin-form">
+            <label htmlFor="adminCameraId">ID</label>
+            <input
+              id="adminCameraId"
+              value={form.id}
+              onChange={(event) => updateForm("id", event.target.value)}
+              placeholder="campo-01"
+              required
+            />
+
+            <label htmlFor="adminCameraName">Nome</label>
+            <input
+              id="adminCameraName"
+              value={form.name}
+              onChange={(event) => updateForm("name", event.target.value)}
+              placeholder="Campo 01"
+              required
+            />
+
+            <label htmlFor="adminCameraNotes">Notas</label>
+            <textarea
+              id="adminCameraNotes"
+              value={form.notes}
+              onChange={(event) => updateForm("notes", event.target.value)}
+              placeholder="Servidor local, posicao, observacoes"
+            />
+
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={form.enabled}
+                onChange={(event) => updateForm("enabled", event.target.checked)}
+              />
+              <span>Camera ativa</span>
+            </label>
+
+            <div className="button-row">
+              <button type="submit" className="primary-action" disabled={busy}>
+                {busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />}
+                Salvar
+              </button>
+              <button type="button" className="secondary-action" onClick={resetForm}>
+                <Plus size={18} />
+                Nova
+              </button>
+            </div>
+          </form>
+        </article>
+
+        <article className="operator-panel">
+          <div className="panel-heading">
+            <KeyRound size={22} />
+            <div>
+              <h2>Acesso</h2>
+              <p>Token exigido para salvar cameras e abrir logs.</p>
+            </div>
+          </div>
+
+          <form onSubmit={saveToken} className="token-form">
+            <label htmlFor="adminOperatorToken">Token de operador</label>
+            <input
+              id="adminOperatorToken"
+              type="password"
+              value={token}
+              onChange={(event) => setToken(event.target.value)}
+              placeholder="token configurado no Render"
+            />
+            <button type="submit" className="secondary-action">
+              <CheckCircle2 size={18} />
+              Salvar token
+            </button>
+          </form>
+
+          <button type="button" className="primary-action" onClick={() => refreshStatus()} disabled={busy}>
+            {busy ? <Loader2 className="spin" size={18} /> : <Activity size={18} />}
+            Status
+          </button>
+
+          <div className="result">
+            <strong>Resultado</strong>
+            <span>{message}</span>
+          </div>
+        </article>
+      </section>
+
+      <section className="admin-grid lower-admin-grid">
+        <article className="operator-panel">
+          <div className="panel-heading">
+            <Camera size={22} />
+            <div>
+              <h2>Cameras cadastradas</h2>
+              <p>Status atualizado pelo capture-server.</p>
+            </div>
+          </div>
+
+          <div className="camera-list">
+            {cameras.length ? (
+              cameras.map((camera) => (
+                <button key={camera.id} type="button" className="camera-row" onClick={() => editCamera(camera)}>
+                  <span>
+                    <strong>{camera.name}</strong>
+                    <small>{camera.id}</small>
+                  </span>
+                  <span className={`status-pill status-${camera.status || "unknown"}`}>
+                    {camera.status || "unknown"}
+                  </span>
+                </button>
+              ))
+            ) : (
+              <p className="muted">Nenhuma camera cadastrada.</p>
+            )}
+          </div>
+        </article>
+
+        <article className="operator-panel">
+          <div className="panel-heading">
+            <FileText size={22} />
+            <div>
+              <h2>Logs</h2>
+              <p>Ultimos eventos do backend e capture-server.</p>
+            </div>
+          </div>
+
+          <div className="log-list">
+            {logs.length ? (
+              logs.slice(0, 30).map((log) => (
+                <div key={log.id} className="log-row">
+                  <span className={`log-level level-${log.level}`}>{log.level}</span>
+                  <div>
+                    <strong>{log.source}{log.camera_id ? ` - ${log.camera_id}` : ""}</strong>
+                    <p>{log.message}</p>
+                    <small>{formatDate(log.created_at)}</small>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="muted">Informe o token e clique em Status para carregar logs.</p>
+            )}
+          </div>
+        </article>
+      </section>
+    </main>
+  );
+}
+
 export default function App() {
+  if (window.location.pathname.startsWith("/admin")) {
+    return <AdminPage />;
+  }
+
   if (window.location.pathname.startsWith("/teste")) {
     return <OperatorPage />;
   }
