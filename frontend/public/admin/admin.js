@@ -1,9 +1,15 @@
 const apiStorageKey = "sertao_api_base_url";
+const tokenStorageKey = "sertao_operator_token";
+const params = new URLSearchParams(window.location.search);
 let api = normalizeApiBase(
-  new URLSearchParams(window.location.search).get("api") ||
+  params.get("api") ||
     localStorage.getItem(apiStorageKey) ||
     "/api",
 );
+const operatorToken = params.get("token") || localStorage.getItem(tokenStorageKey) || "";
+if (operatorToken) {
+  localStorage.setItem(tokenStorageKey, operatorToken);
+}
 let currentPreviewCameraId = null;
 let previewMonitorTimer = null;
 
@@ -12,26 +18,21 @@ function normalizeApiBase(value) {
   return cleaned.endsWith("/") ? cleaned.slice(0, -1) : cleaned;
 }
 
-function apiUrl(path) {
-  return `${api}${path}`;
+function withOperatorToken(url) {
+  if (!operatorToken) {
+    return url;
+  }
+
+  return `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(operatorToken)}`;
+}
+
+function apiUrl(path, includeToken = false) {
+  const url = `${api}${path}`;
+  return includeToken ? withOperatorToken(url) : url;
 }
 
 function replayFileUrl(fileName) {
   return apiUrl(`/replays/file/${encodeURIComponent(fileName)}`);
-}
-
-function downloadReplayFile(fileName) {
-  if (!fileName) {
-    return;
-  }
-
-  const link = document.createElement("a");
-  link.href = replayFileUrl(fileName);
-  link.download = fileName;
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
 }
 
 function redactRtspText(value) {
@@ -78,9 +79,15 @@ function escapeHtml(value) {
 }
 
 async function request(path, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(operatorToken ? { "X-Operator-Token": operatorToken } : {}),
+    ...(options.headers || {}),
+  };
+
   const response = await fetch(apiUrl(path), {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers,
   });
 
   const data = await response.json().catch(() => null);
@@ -101,6 +108,9 @@ function initApiConfig() {
   }
 
   input.value = api;
+  if (operatorToken) {
+    log("Token de operador configurado no navegador");
+  }
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     api = normalizeApiBase(input.value);
@@ -141,14 +151,14 @@ async function loadAdminCameras() {
       item.className = "camera-admin-item";
       item.innerHTML = `
         <strong>${escapeHtml(camera.name)}</strong>
-        <small>${escapeHtml(camera.id)} - ${camera.enabled ? "ativa" : "inativa"}</small>
+        <small>${escapeHtml(camera.id)} - ${camera.enabled ? "ativa" : "inativa"} - ${escapeHtml(camera.status || "unknown")}</small>
+        ${camera.notes ? `<small>${escapeHtml(camera.notes)}</small>` : ""}
         <code>${escapeHtml(redactRtspText(camera.rtsp_url))}</code>
         <div class="camera-admin-actions">
           <button type="button" data-action="edit">Editar</button>
           <button type="button" data-action="test">Testar câmera</button>
           <button type="button" data-action="preview">Visualizar</button>
           <button type="button" data-action="start">Monitorar</button>
-          <button type="button" data-action="replay">Replay 60s</button>
           <button type="button" class="secondary" data-action="stop">Parar</button>
           <button type="button" class="danger" data-action="delete">Remover</button>
         </div>
@@ -158,7 +168,6 @@ async function loadAdminCameras() {
       item.querySelector('[data-action="test"]').addEventListener("click", () => testCamera(camera.id));
       item.querySelector('[data-action="preview"]').addEventListener("click", () => openCameraPreview(camera));
       item.querySelector('[data-action="start"]').addEventListener("click", () => startCameraRecorder(camera.id));
-      item.querySelector('[data-action="replay"]').addEventListener("click", () => createReplay(camera.id, 60));
       item.querySelector('[data-action="stop"]').addEventListener("click", () => stopCameraRecorder(camera.id));
       item.querySelector('[data-action="delete"]').addEventListener("click", () => deleteCamera(camera.id));
       root.appendChild(item);
@@ -174,12 +183,14 @@ function fillCameraForm(camera) {
   document.getElementById("cameraId").value = camera.id;
   document.getElementById("cameraName").value = camera.name;
   document.getElementById("cameraRtsp").value = camera.rtsp_url;
+  document.getElementById("cameraNotes").value = camera.notes || "";
   document.getElementById("cameraEnabled").checked = camera.enabled;
 }
 
 function clearCameraForm() {
   document.getElementById("cameraForm").reset();
   document.getElementById("cameraId").value = "";
+  document.getElementById("cameraNotes").value = "";
   document.getElementById("cameraEnabled").checked = true;
   log("Formulario limpo para nova camera");
 }
@@ -241,7 +252,10 @@ function refreshCameraPreview() {
   const placeholder = document.getElementById("cameraPreviewPlaceholder");
   placeholder.textContent = "Atualizando imagem da camera...";
   image.removeAttribute("src");
-  image.src = apiUrl(`/cameras/${encodeURIComponent(currentPreviewCameraId)}/snapshot?ts=${Date.now()}`);
+  image.src = apiUrl(
+    `/cameras/${encodeURIComponent(currentPreviewCameraId)}/snapshot?ts=${Date.now()}`,
+    true,
+  );
   log("Snapshot da camera solicitado", { camera_id: currentPreviewCameraId });
 }
 
@@ -263,6 +277,7 @@ async function saveCamera(event) {
     name: document.getElementById("cameraName").value.trim(),
     rtsp_url: document.getElementById("cameraRtsp").value.trim(),
     enabled: document.getElementById("cameraEnabled").checked,
+    notes: document.getElementById("cameraNotes").value.trim() || null,
   };
 
   try {
@@ -347,52 +362,6 @@ async function loadRecorderStatus(silent = false) {
       log("Erro ao verificar monitoramento", { error: error.message });
     }
   }
-}
-
-async function createReplay(cameraId, seconds = 60) {
-  try {
-    log(`Gerando replay dos ultimos ${seconds}s da camera ${cameraId}...`);
-    const data = await request("/replay", {
-      method: "POST",
-      body: JSON.stringify({
-        camera_id: cameraId,
-        seconds,
-        label: "botao_replay",
-      }),
-    });
-    log(data.ok ? "Replay pronto para salvar" : "Replay nao gerado", data);
-    renderReplayResult(data);
-    if (data?.ok && data.file_name) {
-      downloadReplayFile(data.file_name);
-      log("Download do replay iniciado", { file_name: data.file_name });
-    }
-    await loadReplays(true);
-  } catch (error) {
-    log("Erro ao gerar replay", { error: error.message });
-  }
-}
-
-function renderReplayResult(data) {
-  const root = document.getElementById("replayResult");
-  if (!root) {
-    return;
-  }
-
-  root.classList.remove("hidden");
-
-  if (!data?.ok || !data.file_name) {
-    root.innerHTML = `<strong>Replay indisponivel</strong><span>${escapeHtml(
-      data?.message || "Inicie o monitoramento e aguarde alguns segundos.",
-    )}</span>`;
-    return;
-  }
-
-  const url = replayFileUrl(data.file_name);
-  root.innerHTML = `
-    <strong>Replay gerado</strong>
-    <span>${escapeHtml(data.file_name)} - ${data.seconds}s</span>
-    <a class="button" href="${url}" download>Salvar video no aparelho</a>
-  `;
 }
 
 async function loadReplays(silent = false) {

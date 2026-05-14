@@ -12,14 +12,19 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./sports_replay.db"
     cors_origins: str = "*"
+    operator_token: str | None = None
 
     cameras_config_path: str = "../config/cameras.json"
     buffer_root: str = "./storage/buffer"
     replay_root: str = "./storage/replays"
+    log_root: str = "./storage/logs"
 
     segment_time_seconds: int = 2
     segment_wrap_count: int = 120
     default_replay_seconds: int = 15
+    camera_connect_timeout_seconds: int = 10
+    recorder_max_restarts: int = 5
+    recorder_restart_backoff_seconds: int = 8
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -34,6 +39,10 @@ class Settings(BaseSettings):
     @property
     def replay_path(self) -> Path:
         return Path(self.replay_root).resolve()
+
+    @property
+    def log_path(self) -> Path:
+        return Path(self.log_root).resolve()
 
     @property
     def cameras_path(self) -> Path:

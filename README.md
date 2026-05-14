@@ -1,153 +1,155 @@
-# Sertão Replay
+# Sertao Replay
 
-Primeira versão do sistema de replay esportivo.
+MVP de replay esportivo com FastAPI, SQLite, FFmpeg e uma home para o cliente assistir e baixar os lances gerados.
 
-## Arquitetura da versão 1
+## Arquitetura atual
 
 ```text
-Câmera IP / RTSP
-        ↓
-GStreamer
-        ↓
-Preview / teste de baixa latência
-        ↓
-FFmpeg
-        ↓
-Buffer contínuo em segmentos
-        ↓
-FastAPI
-        ↓
-Interface Web
-        ↓
-SQLite
-        ↓
-Arduino Leonardo / botões físicos
+Camera IP / RTSP
+        -> FFmpeg
+        -> buffer circular em segmentos
+        -> FastAPI
+        -> SQLite
+        -> arquivos MP4 em storage/replays
+        -> home do cliente
 ```
 
-## O que já vem pronto
+O banco agora persiste:
 
-- Backend FastAPI
-- Interface web simples
-- Cadastro de câmera via arquivo JSON
-- Serviço de gravação contínua com FFmpeg
-- Geração de replay dos últimos segundos
-- Registro de eventos no SQLite
-- Estrutura para GStreamer
-- Firmware base para Arduino Leonardo
-- Scripts de instalação e execução
+- cameras cadastradas;
+- status da camera;
+- eventos tecnicos;
+- replays gerados, com camera de origem, duracao, status e URL do video.
+
+O arquivo `config/cameras.json` continua existindo apenas como legado/fallback: se o banco estiver vazio, o backend importa essas cameras uma vez.
 
 ## Requisitos
 
-Instale no computador:
-
 - Python 3.11+
-- FFmpeg
-- GStreamer
-- VLC, opcional para teste manual
-- Arduino IDE, para gravar o Leonardo
+- FFmpeg instalado ou disponivel via `imageio-ffmpeg`
+- Node.js 20+ para build/dev do frontend
+- GStreamer opcional para testes manuais
 
-## Instalação rápida
+## Configurar o banco
 
-Entre na pasta do backend:
+O padrao usa SQLite dentro da pasta `backend`:
+
+```env
+DATABASE_URL=sqlite:///./sports_replay.db
+```
+
+Para usar PostgreSQL, altere `DATABASE_URL` no arquivo `backend/.env` seguindo o formato SQLAlchemy.
+
+Crie o ambiente do backend:
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy ..\config\.env.example .env
+python -c "from app.db.init_db import init_db; init_db()"
+```
+
+No Linux/macOS:
 
 ```bash
 cd backend
 python -m venv .venv
-```
-
-No Windows:
-
-```bash
-.venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-No Linux:
-
-```bash
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-Copie o arquivo de ambiente:
-
-```bash
-copy ..\config\.env.example .env
-```
-
-No Linux:
-
-```bash
 cp ../config/.env.example .env
+python -c "from app.db.init_db import init_db; init_db()"
 ```
 
-Crie o arquivo:
+## Rodar localmente
 
-```text
-config/cameras.json
-```
-
-Exemplo:
-
-```json
-[
-  {
-    "id": "cam1",
-    "name": "Câmera Campo 1",
-    "rtsp_url": "rtsp://usuario:senha@192.168.0.100:554/stream1",
-    "enabled": true
-  }
-]
-```
-
-## Camera via MediaMTX na VPS
-
-Neste setup, o MediaMTX roda na VPS e recebe o stream publicado pelo seu Windows.
-
-- URL para o backend gravar/replay: `rtsp://54.207.185.74:8554/camera1`
-- URL para assistir no navegador via HLS/WebRTC: `http://54.207.185.74:8888/camera1/`
-
-No PowerShell do Windows, publique a camera local para a VPS:
+Backend:
 
 ```powershell
-.\scripts\push_camera_to_mediamtx.ps1 -LocalCameraUrl "rtsp://usuario:senha@IP_DA_CAMERA:554/stream1"
-```
-
-Comando FFmpeg equivalente:
-
-```powershell
-ffmpeg -rtsp_transport tcp -i "rtsp://usuario:senha@IP_DA_CAMERA:554/stream1" -an -c:v copy -f rtsp -rtsp_transport tcp "rtsp://54.207.185.74:8554/camera1"
-```
-
-## Rodar o backend
-
-```bash
 cd backend
+.\.venv\Scripts\Activate.ps1
+uvicorn app.main:app --reload
+```
+
+Frontend em desenvolvimento:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+O Vite encaminha `/api` para `http://127.0.0.1:8000`.
+
+Para servir tudo pelo FastAPI, gere o build:
+
+```powershell
+cd frontend
+npm run build
+cd ..\backend
 uvicorn app.main:app --reload
 ```
 
 Acesse:
 
+- Home do cliente: `http://127.0.0.1:8000/`
+- Teste de camera: `http://127.0.0.1:8000/teste/`
+- Cadastro/admin: `http://127.0.0.1:8000/admin/`
+
+## Cadastrar camera
+
+1. Abra `/admin/`.
+2. Informe `ID`, nome, URL RTSP, status ativo e observacoes se necessario.
+3. Salve a camera.
+4. Recarregue a pagina ou reinicie o servidor: a camera deve continuar no banco.
+
+O backend valida campos, evita URL RTSP duplicada e redige credenciais em logs.
+
+## Testar conexao da camera
+
+1. Abra `/teste/`.
+2. Selecione uma camera cadastrada.
+3. Clique em `Testar conexao`.
+4. O status exibira online, offline, conectando ou erro.
+
+Se a camera estiver em rede local, rode o backend na mesma rede da camera.
+
+## Gerar replay
+
+1. Em `/teste/`, clique em `Iniciar buffer`.
+2. Aguarde alguns segundos para o FFmpeg criar segmentos.
+3. Clique em `Gerar replay 15s`.
+4. O backend cria o MP4 em `backend/storage/replays` e salva o registro na tabela `replays`.
+
+Se o buffer ainda nao tiver segmentos, o backend tenta gravar um clipe direto da camera como fallback.
+
+## Visualizar e baixar na home
+
+Abra `/`. A home lista apenas replays prontos, com:
+
+- player de video na propria pagina;
+- data e hora de criacao;
+- camera de origem;
+- duracao;
+- botao de baixar video.
+
+Ela atualiza automaticamente a lista periodicamente.
+
+## Logs
+
+Os logs ficam em:
+
 ```text
-http://127.0.0.1:8000
+backend/storage/logs/app.log
 ```
 
-## Fluxo de teste
+Eventos registrados:
 
-1. Teste a câmera no VLC.
-2. Coloque o link RTSP em `config/cameras.json`.
-3. Abra o backend.
-4. Clique em `Iniciar gravação`.
-5. Aguarde alguns segundos.
-6. Clique em `Replay 15s`.
-7. Veja o arquivo gerado em `backend/storage/replays`.
+- conexao e falha de camera;
+- inicio, queda e reconexao de buffer;
+- criacao de replay;
+- importacao de dados legados;
+- erros de banco e operacoes importantes.
 
-## Observação importante
-
-Essa versão é a base inicial. Ela não é o produto final ainda. O objetivo é validar:
-
-- câmera RTSP funcionando;
-- buffer contínuo;
-- comando de replay;
-- interface web;
-- controle físico pelo Leonardo.
+URLs RTSP com usuario/senha, tokens e segredos sao redigidos antes de aparecerem nos logs da aplicacao.

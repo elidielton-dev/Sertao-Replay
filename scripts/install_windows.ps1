@@ -7,5 +7,7 @@ if (!(Test-Path ".env")) {
   Copy-Item ..\config\.env.example .env
 }
 
-Write-Host "Instalação concluída."
-Write-Host "Edite config/cameras.json com o RTSP da câmera."
+python -c "from app.db.init_db import init_db; init_db()"
+
+Write-Host "Instalacao concluida."
+Write-Host "Inicie o backend e cadastre as cameras pelo painel /admin/."

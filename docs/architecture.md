@@ -1,116 +1,67 @@
-# Arquitetura do Sertão Replay
+# Arquitetura do Sertao Replay
 
 ## Objetivo
 
-Criar uma primeira versão funcional do sistema de replay esportivo.
-
-O foco da versão 1 é provar:
-
-- captura de câmera IP;
-- gravação contínua;
-- geração de replay;
-- comando por botão;
-- interface simples para operador.
+Entregar um fluxo funcional para cadastrar cameras, manter buffer de video,
+gerar replays e exibir os lances na home do cliente.
 
 ## Camadas
 
-### 1. Câmera
+### Camera RTSP
 
-Entrada principal:
+A camera e cadastrada pelo painel `/admin/` e persistida no banco. A URL RTSP
+fica no backend e nao aparece na home do cliente.
 
-```text
-Câmera IP via RTSP
-```
+### FFmpeg
 
-Exemplo:
+O backend usa FFmpeg para:
 
-```text
-rtsp://usuario:senha@192.168.0.100:554/stream1
-```
+- testar conexao por snapshot;
+- manter buffer circular em `backend/storage/buffer`;
+- gerar MP4s em `backend/storage/replays`;
+- tentar reconectar de forma controlada quando a camera cai.
 
-### 2. GStreamer
+### Backend FastAPI
 
-Usado para:
+Responsavel por:
 
-- testar pipeline da câmera;
-- preview de baixa latência;
-- evolução futura para multi-câmera e processamento mais fino.
+- CRUD de cameras;
+- status de camera e buffer;
+- criacao de replay de 15s ou outros tempos permitidos pela API;
+- download seguro dos arquivos MP4;
+- logs com credenciais redigidas.
 
-Na v1, a integração é por comando externo `gst-launch-1.0`.
+### Banco
 
-### 3. FFmpeg
+O padrao e SQLite via `DATABASE_URL=sqlite:///./sports_replay.db`.
 
-Usado para:
+Tabelas principais:
 
-- receber stream RTSP;
-- gravar em segmentos;
-- manter buffer circular;
-- gerar replay final em MP4.
+- `cameras`;
+- `replays`;
+- `replay_events`.
 
-### 4. Backend FastAPI
+Uma camera pode originar varios replays. O registro do replay tambem salva o
+nome da camera para preservar historico mesmo se a camera for arquivada.
 
-Responsável por:
+### Frontend
 
-- iniciar/parar gravação;
-- receber comando de replay;
-- listar câmeras;
-- listar arquivos de replay;
-- salvar eventos no banco.
-
-### 5. Banco SQLite
-
-Responsável por salvar:
-
-- horário do replay;
-- câmera;
-- duração;
-- status;
-- caminho do arquivo gerado.
-
-No futuro pode ser trocado por PostgreSQL.
-
-### 6. Interface Web
-
-Painel do operador com:
-
-- status da API;
-- câmeras;
-- gravação;
-- botões de replay;
-- lista de vídeos gerados.
-
-### 7. Arduino Leonardo
-
-Controlador físico que funciona como teclado USB.
-
-Botões:
-
-- replay 10s;
-- replay 15s;
-- replay 30s;
-- salvar lance;
-- trocar câmera.
+- `/admin/`: cadastro e operacao de cameras.
+- `/teste/`: teste de conexao, buffer e envio de replay de 15s para a home.
+- `/`: home do cliente com player e download dos replays prontos.
 
 ## Fluxo de replay
 
 ```text
-1. FFmpeg grava a câmera em segmentos .ts
-2. Operador clica Replay 15s
-3. FastAPI recebe o comando
-4. ReplayService pega os segmentos mais recentes
-5. FFmpeg concatena os segmentos
-6. Sistema gera arquivo MP4
-7. Interface mostra o replay gerado
+1. Operador cadastra camera no /admin/
+2. Operador testa a camera no /teste/
+3. Operador inicia o buffer
+4. FFmpeg grava segmentos no storage/buffer
+5. Operador clica Gerar replay 15s
+6. ReplayService junta os ultimos segmentos em MP4
+7. Backend salva o registro em replays
+8. Home carrega /api/replays e exibe o video
 ```
 
-## Evoluções futuras
-
-- WebSocket para status em tempo real;
-- suporte multi-câmera;
-- preview dentro da interface;
-- hotkeys do Arduino lidas diretamente pelo Python;
-- PostgreSQL;
-- NDI;
-- slow motion;
-- replay com overlay;
-- exportação automática de melhores momentos.
+Se ainda nao houver segmentos, o backend tenta gravar um clipe direto da camera
+como fallback.

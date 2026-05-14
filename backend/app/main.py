@@ -6,9 +6,14 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
 from app.core.config import get_settings
+from app.core.logging import configure_logging, get_logger
 from app.db.init_db import init_db
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 settings = get_settings()
+configure_logging(str(settings.log_path), settings.app_env)
+logger = get_logger(__name__)
 
 app = FastAPI(
     title=settings.app_name,
@@ -28,9 +33,18 @@ app.add_middleware(
 
 app.include_router(router, prefix="/api")
 
-frontend_dist_path = Path("../frontend/dist").resolve()
-frontend_source_path = Path("../frontend").resolve()
+frontend_dist_path = (PROJECT_ROOT / "frontend" / "dist").resolve()
+frontend_source_path = (PROJECT_ROOT / "frontend").resolve()
 frontend_path = frontend_dist_path if frontend_dist_path.exists() else frontend_source_path
+frontend_public_path = frontend_source_path / "public"
+
+if frontend_public_path.exists():
+    teste_path = frontend_public_path / "teste"
+    admin_path = frontend_public_path / "admin"
+    if teste_path.exists():
+        app.mount("/teste", StaticFiles(directory=str(teste_path), html=True), name="teste")
+    if admin_path.exists():
+        app.mount("/admin", StaticFiles(directory=str(admin_path), html=True), name="admin")
 
 if frontend_path.exists():
     app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
@@ -40,4 +54,6 @@ if frontend_path.exists():
 def on_startup() -> None:
     settings.buffer_path.mkdir(parents=True, exist_ok=True)
     settings.replay_path.mkdir(parents=True, exist_ok=True)
+    settings.log_path.mkdir(parents=True, exist_ok=True)
     init_db()
+    logger.info("Aplicacao iniciada.")

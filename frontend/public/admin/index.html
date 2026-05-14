@@ -229,7 +229,8 @@
       font-weight: 800;
     }
 
-    input {
+    input,
+    textarea {
       width: 100%;
       border: 1px solid rgba(255, 255, 255, 0.11);
       border-radius: 16px;
@@ -240,7 +241,13 @@
       font-size: 0.98rem;
     }
 
-    input:focus {
+    textarea {
+      min-height: 96px;
+      resize: vertical;
+    }
+
+    input:focus,
+    textarea:focus {
       border-color: var(--green);
       box-shadow: 0 0 0 4px rgba(135, 255, 63, 0.12);
     }
@@ -435,7 +442,6 @@
     }
 
     .monitor-panel,
-    .replay-result,
     .replay-item {
       margin-top: 14px;
       border: 1px solid rgba(135, 255, 63, 0.16);
@@ -445,25 +451,15 @@
     }
 
     .status-row,
-    .replay-result,
     .replay-item {
       display: grid;
       gap: 7px;
     }
 
     .status-row strong,
-    .replay-result strong,
     .replay-item strong,
     .replay-item a {
       color: var(--green);
-    }
-
-    .replay-result.hidden {
-      display: none;
-    }
-
-    .replay-result .button {
-      margin-top: 6px;
     }
 
     .replay-item small {
@@ -545,7 +541,7 @@
           <div class="metric"><strong>04</strong><small>campos</small></div>
           <div class="metric"><strong>RTSP</strong><small>entrada</small></div>
           <div class="metric"><strong>API</strong><small>FastAPI</small></div>
-          <div class="metric"><strong>24/7</strong><small>buffer</small></div>
+            <div class="metric"><strong>DB</strong><small>persistencia</small></div>
         </div>
         <button onclick="checkAdminHealth()">Verificar API</button>
         <div class="inline-log">
@@ -570,6 +566,9 @@
         <label for="cameraRtsp">URL RTSP</label>
         <input id="cameraRtsp" placeholder="rtsp://usuario:senha@192.168.0.100:554/stream1" required />
 
+        <label for="cameraNotes">Observacoes</label>
+        <textarea id="cameraNotes" placeholder="Campo, posicao, detalhes de rede ou instalacao"></textarea>
+
         <label class="check-row">
           <input id="cameraEnabled" type="checkbox" checked />
           <span>Ativa</span>
@@ -589,8 +588,7 @@
             <span>Monitoramento</span>
             <strong id="recorderStatus">Verificando gravacao...</strong>
           </div>
-          <p class="section-copy">Clique em Monitorar na camera desejada. O botao Replay 60s gera o video dos ultimos segundos disponiveis e libera o download.</p>
-          <div id="replayResult" class="replay-result hidden"></div>
+          <p class="section-copy">Use Testar camera para validar conexao. Use Monitorar para manter o buffer ativo antes de gerar replays na pagina de teste.</p>
           <div id="adminReplays"></div>
         </div>
         <div id="cameraPreview" class="camera-preview hidden">

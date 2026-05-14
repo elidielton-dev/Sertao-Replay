@@ -44,6 +44,9 @@ backend/storage/logs/*
 *.mkv
 *.ts
 *.log
+!frontend/public/replays/
+!frontend/public/replays/*.mp4
+!frontend/public/replays/*.json
 
 # Node / frontend tooling
 node_modules/
@@ -59,3 +62,6 @@ desktop.ini
 .vscode/
 *.swp
 *.swo
+
+.vercel
+.env*.local
