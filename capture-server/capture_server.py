@@ -43,6 +43,7 @@ class CaptureServer:
         self.camera_id = env("CAMERA_ID")
         self.local_rtsp_url = env("LOCAL_RTSP_URL")
         self.rtsp_transport = os.getenv("RTSP_TRANSPORT", "tcp").strip().lower() or "tcp"
+        self.replay_video_codec = os.getenv("REPLAY_VIDEO_CODEC", "libx264").strip() or "libx264"
         self.default_replay_seconds = int(os.getenv("DEFAULT_REPLAY_SECONDS", "15"))
         self.segment_time_seconds = int(os.getenv("SEGMENT_TIME_SECONDS", "2"))
         self.segment_wrap_count = int(os.getenv("SEGMENT_WRAP_COUNT", "120"))
@@ -196,8 +197,17 @@ class CaptureServer:
             "0",
             "-i",
             str(concat_file),
-            "-c",
-            "copy",
+            "-t",
+            str(seconds),
+            "-an",
+            "-vf",
+            f"trim=duration={seconds},setpts=PTS-STARTPTS,fps=30",
+            "-c:v",
+            self.replay_video_codec,
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
             "-movflags",
             "+faststart",
             str(output_file),
@@ -211,7 +221,7 @@ class CaptureServer:
         return output_file
 
     def latest_segments(self, seconds: int) -> list[Path]:
-        count = max(1, int(seconds / self.segment_time_seconds) + 1)
+        count = max(1, int(seconds / self.segment_time_seconds) + 3)
         segments = list(self.buffer_dir.glob("segment_*.ts"))
         return sorted(segments, key=lambda path: path.stat().st_mtime)[-count:]
 
