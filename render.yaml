@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: sports-replay-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: CORS_ORIGINS
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sports-replay-db
+          property: connectionString
+      - key: OPERATOR_TOKEN
+        generateValue: true
+
+databases:
+  - name: sports-replay-db
+    databaseName: sports_replay
+    user: sports_replay

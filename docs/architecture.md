@@ -1,67 +1,53 @@
 # Arquitetura do Sertao Replay
 
-## Objetivo
-
-Entregar um fluxo funcional para cadastrar cameras, manter buffer de video,
-gerar replays e exibir os lances na home do cliente.
-
-## Camadas
-
-### Camera RTSP
-
-A camera e cadastrada pelo painel `/admin/` e persistida no banco. A URL RTSP
-fica no backend e nao aparece na home do cliente.
-
-### FFmpeg
-
-O backend usa FFmpeg para:
-
-- testar conexao por snapshot;
-- manter buffer circular em `backend/storage/buffer`;
-- gerar MP4s em `backend/storage/replays`;
-- tentar reconectar de forma controlada quando a camera cai.
-
-### Backend FastAPI
-
-Responsavel por:
-
-- CRUD de cameras;
-- status de camera e buffer;
-- criacao de replay de 15s ou outros tempos permitidos pela API;
-- download seguro dos arquivos MP4;
-- logs com credenciais redigidas.
-
-### Banco
-
-O padrao e SQLite via `DATABASE_URL=sqlite:///./sports_replay.db`.
-
-Tabelas principais:
-
-- `cameras`;
-- `replays`;
-- `replay_events`.
-
-Uma camera pode originar varios replays. O registro do replay tambem salva o
-nome da camera para preservar historico mesmo se a camera for arquivada.
-
-### Frontend
-
-- `/admin/`: cadastro e operacao de cameras.
-- `/teste/`: teste de conexao, buffer e envio de replay de 15s para a home.
-- `/`: home do cliente com player e download dos replays prontos.
-
-## Fluxo de replay
-
 ```text
-1. Operador cadastra camera no /admin/
-2. Operador testa a camera no /teste/
-3. Operador inicia o buffer
-4. FFmpeg grava segmentos no storage/buffer
-5. Operador clica Gerar replay 15s
-6. ReplayService junta os ultimos segmentos em MP4
-7. Backend salva o registro em replays
-8. Home carrega /api/replays e exibe o video
+Camera RTSP -> servidor local da arena -> capture-server -> backend Render -> frontend Vercel
 ```
 
-Se ainda nao houver segmentos, o backend tenta gravar um clipe direto da camera
-como fallback.
+## Camera RTSP
+
+A camera fica na rede local da arena. A URL RTSP, usuario e senha existem apenas no `.env` do `capture-server`.
+
+## Capture-server local
+
+Processo Python que roda no servidor da arena:
+
+- abre o RTSP com FFmpeg;
+- mantem buffer circular em segmentos locais;
+- consulta a fila de replay no backend;
+- gera o MP4 dos ultimos segundos;
+- envia upload para o backend;
+- atualiza status da camera e envia logs;
+- reinicia FFmpeg quando a captura cai.
+
+## Backend Render
+
+API FastAPI sem acesso a RTSP:
+
+- cameras;
+- replays;
+- uploads de MP4;
+- solicitacoes de replay;
+- logs;
+- PostgreSQL em producao.
+
+O backend nao tenta acessar IPs locais como `192.168.x.x`.
+
+## Frontend Vercel
+
+Aplicacao Vite/React:
+
+- `/`: Home do cliente para assistir e baixar replays;
+- `/teste`: tela do operador para criar solicitacao `Replay 15s`.
+
+O frontend consome `VITE_API_BASE_URL` e nao fala com camera.
+
+## Fluxo
+
+1. Capture-server registra/atualiza a camera no backend.
+2. Operador clica em `Replay 15s` no frontend.
+3. Backend salva a solicitacao como `pending`.
+4. Capture-server pega a solicitacao e muda para `processing`.
+5. Capture-server gera o MP4 e faz upload.
+6. Backend marca a solicitacao como `completed`.
+7. Home busca `/api/replays` periodicamente e exibe o novo video.

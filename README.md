@@ -1,66 +1,102 @@
 # Sertao Replay
 
-MVP de replay esportivo com FastAPI, SQLite, FFmpeg e uma home para o cliente assistir e baixar os lances gerados.
-
-## Arquitetura atual
+MVP de replay esportivo separado para deploy real: frontend na Vercel, backend no Render e captura de video no servidor local da arena.
 
 ```text
-Camera IP / RTSP
-        -> FFmpeg
-        -> buffer circular em segmentos
-        -> FastAPI
-        -> SQLite
-        -> arquivos MP4 em storage/replays
-        -> home do cliente
+Camera RTSP
+   ->
+Servidor local da arena
+   ->
+capture-server
+   ->
+Backend no Render
+   ->
+Frontend na Vercel
 ```
 
-O banco agora persiste:
+## Responsabilidades
 
-- cameras cadastradas;
-- status da camera;
-- eventos tecnicos;
-- replays gerados, com camera de origem, duracao, status e URL do video.
+### `frontend/` - Vercel
 
-O arquivo `config/cameras.json` continua existindo apenas como legado/fallback: se o banco estiver vazio, o backend importa essas cameras uma vez.
+- Home do cliente em `/`, com lista de replays, player de video e download.
+- Tela do operador em `/teste`, com botao `Replay 15s`.
+- Consome somente a API publica do backend.
+- Nao acessa RTSP e nao conhece usuario/senha da camera.
 
-## Requisitos
-
-- Python 3.11+
-- FFmpeg instalado ou disponivel via `imageio-ffmpeg`
-- Node.js 20+ para build/dev do frontend
-- GStreamer opcional para testes manuais
-
-## Configurar o banco
-
-O padrao usa SQLite dentro da pasta `backend`:
+Variavel obrigatoria na Vercel:
 
 ```env
-DATABASE_URL=sqlite:///./sports_replay.db
+VITE_API_BASE_URL=https://URL-DO-BACKEND.onrender.com/api
 ```
 
-Para usar PostgreSQL, altere `DATABASE_URL` no arquivo `backend/.env` seguindo o formato SQLAlchemy.
+### `backend/` - Render
 
-Crie o ambiente do backend:
+- API FastAPI.
+- Cadastro de cameras sem URL RTSP.
+- Fila de solicitacoes de replay.
+- Recebimento de uploads MP4 do capture-server.
+- Registro de replays, eventos e logs.
+- PostgreSQL em producao.
 
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-copy ..\config\.env.example .env
-python -c "from app.db.init_db import init_db; init_db()"
+Endpoints principais:
+
+```text
+GET    /api/health
+GET    /api/cameras
+POST   /api/cameras
+GET    /api/replays
+POST   /api/replays
+POST   /api/replays/upload
+GET    /api/logs
+POST   /api/logs
+POST   /api/replay-requests
+GET    /api/replay-requests/pending
 ```
 
-No Linux/macOS:
+O backend no Render nao conecta em cameras locais `192.168.x.x`, nao mantem buffer FFmpeg e nao recebe senha RTSP.
 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp ../config/.env.example .env
-python -c "from app.db.init_db import init_db; init_db()"
+Variaveis recomendadas no Render:
+
+```env
+APP_ENV=production
+DATABASE_URL=postgresql://...
+CORS_ORIGINS=https://URL-DO-FRONTEND.vercel.app
+OPERATOR_TOKEN=token_seguro
+REPLAY_ROOT=./storage/replays
+LOG_ROOT=./storage/logs
 ```
+
+### `capture-server/` - servidor local da arena
+
+- Roda na maquina que enxerga a camera RTSP.
+- Mantem buffer circular local com FFmpeg.
+- Consulta solicitacoes pendentes no backend.
+- Gera MP4 dos ultimos 15 segundos.
+- Envia o MP4 para `/api/replays/upload`.
+- Atualiza status da camera e envia logs.
+- Reconecta automaticamente se o FFmpeg cair.
+
+Exemplo:
+
+```env
+BACKEND_API_URL=https://URL-DO-BACKEND.onrender.com/api
+OPERATOR_TOKEN=token_seguro
+CAMERA_ID=campo-01
+LOCAL_RTSP_URL=rtsp://usuario:senha@192.168.0.6:554/onvif1
+DEFAULT_REPLAY_SECONDS=15
+```
+
+## Fluxo de replay
+
+1. A camera fica conectada ao servidor local da arena.
+2. O `capture-server` acessa a camera via RTSP e mantem o buffer.
+3. O operador abre `/teste` na Vercel e clica em `Replay 15s`.
+4. O frontend chama o backend no Render.
+5. O backend cria uma solicitacao de replay.
+6. O `capture-server` consulta `/api/replay-requests/pending`.
+7. O `capture-server` corta os ultimos 15 segundos e envia o MP4.
+8. O backend salva o replay no banco.
+9. A Home atualiza automaticamente e mostra o video para assistir e baixar.
 
 ## Rodar localmente
 
@@ -68,88 +104,43 @@ Backend:
 
 ```powershell
 cd backend
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy ..\config\.env.example .env
 uvicorn app.main:app --reload
 ```
 
-Frontend em desenvolvimento:
+Frontend:
 
 ```powershell
 cd frontend
 npm install
+copy .env.example .env
 npm run dev
 ```
 
-O Vite encaminha `/api` para `http://127.0.0.1:8000`.
-
-Para servir tudo pelo FastAPI, gere o build:
+Capture-server:
 
 ```powershell
-cd frontend
-npm run build
-cd ..\backend
-uvicorn app.main:app --reload
+cd capture-server
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy .env.example .env
+python capture_server.py
 ```
 
-Acesse:
+## Deploy
 
-- Home do cliente: `http://127.0.0.1:8000/`
-- Teste de camera: `http://127.0.0.1:8000/teste/`
-- Cadastro/admin: `http://127.0.0.1:8000/admin/`
+- Vercel: use o projeto `frontend/` ou o `vercel.json` da raiz. Configure `VITE_API_BASE_URL`.
+- Render: use o `render.yaml` da raiz ou crie um Web Service com root `backend`, build `pip install -r requirements.txt` e start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+- Banco: use PostgreSQL no Render e configure `DATABASE_URL`.
+- Arena: instale FFmpeg no servidor local e rode `capture-server/capture_server.py` como servico.
 
-## Cadastrar camera
+## Seguranca do MVP
 
-1. Abra `/admin/`.
-2. Informe `ID`, nome, URL RTSP, status ativo e observacoes se necessario.
-3. Salve a camera.
-4. Recarregue a pagina ou reinicie o servidor: a camera deve continuar no banco.
-
-O backend valida campos, evita URL RTSP duplicada e redige credenciais em logs.
-
-## Testar conexao da camera
-
-1. Abra `/teste/`.
-2. Selecione uma camera cadastrada.
-3. Clique em `Testar conexao`.
-4. O status exibira online, offline, conectando ou erro.
-
-Se a camera estiver em rede local, rode o backend na mesma rede da camera.
-
-## Gerar replay
-
-1. Em `/teste/`, clique em `Iniciar buffer`.
-2. Aguarde alguns segundos para o FFmpeg criar segmentos.
-3. Clique em `Gerar replay 15s`.
-4. O backend cria o MP4 em `backend/storage/replays` e salva o registro na tabela `replays`.
-
-Se o buffer ainda nao tiver segmentos, o backend tenta gravar um clipe direto da camera como fallback.
-
-## Visualizar e baixar na home
-
-Abra `/`. A home lista apenas replays prontos, com:
-
-- player de video na propria pagina;
-- data e hora de criacao;
-- camera de origem;
-- duracao;
-- botao de baixar video.
-
-Ela atualiza automaticamente a lista periodicamente.
-
-## Logs
-
-Os logs ficam em:
-
-```text
-backend/storage/logs/app.log
-```
-
-Eventos registrados:
-
-- conexao e falha de camera;
-- inicio, queda e reconexao de buffer;
-- criacao de replay;
-- importacao de dados legados;
-- erros de banco e operacoes importantes.
-
-URLs RTSP com usuario/senha, tokens e segredos sao redigidos antes de aparecerem nos logs da aplicacao.
+- RTSP e senha da camera ficam somente no `.env` do `capture-server`.
+- O frontend nunca recebe URL RTSP.
+- Logs redigem credenciais RTSP, tokens e segredos de query string.
+- Rotas de operador exigem `OPERATOR_TOKEN` quando `APP_ENV=production`.

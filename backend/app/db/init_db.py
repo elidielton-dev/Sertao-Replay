@@ -5,6 +5,8 @@ from app.db.session import Base, engine
 from app.models.camera import CameraConfig  # noqa: F401
 from app.models.event import ReplayEvent  # noqa: F401
 from app.models.replay import Replay  # noqa: F401
+from app.models.replay_request import ReplayRequestQueue  # noqa: F401
+from app.models.system_log import SystemLog  # noqa: F401
 
 logger = get_logger(__name__)
 
@@ -32,8 +34,8 @@ def _run_lightweight_migrations() -> None:
                     "ADD COLUMN status VARCHAR(30) NOT NULL DEFAULT 'unknown'"
                 )
             )
-            logger.info("Migração aplicada: cameras.status.")
+            logger.info("Migracao aplicada: cameras.status.")
 
         if "notes" not in camera_columns:
             connection.execute(text("ALTER TABLE cameras ADD COLUMN notes TEXT"))
-            logger.info("Migração aplicada: cameras.notes.")
+            logger.info("Migracao aplicada: cameras.notes.")

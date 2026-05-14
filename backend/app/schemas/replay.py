@@ -31,6 +31,26 @@ class ReplayResponse(BaseModel):
     download_url: str | None = None
 
 
+class ReplayUploadResponse(BaseModel):
+    ok: bool
+    replay_id: int
+    request_id: int | None = None
+    video_url: str
+    download_url: str
+    message: str
+
+
+class ReplayRequestRecord(BaseModel):
+    id: int
+    camera_id: str
+    seconds: int
+    label: str | None = None
+    status: str
+    message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class ReplayRecord(BaseModel):
     id: int
     camera_id: str

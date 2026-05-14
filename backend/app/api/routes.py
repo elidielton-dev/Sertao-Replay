@@ -1,28 +1,25 @@
-import time
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.sanitize import truncate_text
-from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.event import ReplayEvent
-from app.models.replay import Replay
-from app.schemas.camera import CameraCreate, PublicCamera
+from app.models.replay_request import ReplayRequestQueue
+from app.models.system_log import SystemLog
+from app.schemas.camera import CameraCreate
 from app.schemas.replay import ReplayRequest
 from app.services.camera_service import CameraService
-from app.services.ffmpeg_recorder import FFmpegRecorder
-from app.services.gstreamer_service import GStreamerService
 from app.services.replay_service import ReplayService
 
 router = APIRouter()
 logger = get_logger(__name__)
 
 camera_service = CameraService()
-gstreamer_service = GStreamerService()
-ffmpeg_recorder = FFmpegRecorder()
 replay_service = ReplayService()
 settings = get_settings()
 
@@ -42,250 +39,147 @@ def require_operator(
     raise HTTPException(status_code=403, detail="Acesso de operador nao autorizado.")
 
 
-@router.get("/health")
-def health():
-    return {"ok": True, "message": "Sertao Replay online"}
-
-
-@router.get("/system/check")
-def system_check():
-    ffmpeg_ok = ffmpeg_recorder.check_installed()
+def _request_response(record: ReplayRequestQueue) -> dict:
     return {
-        "gstreamer": gstreamer_service.run_version_check(),
-        "ffmpeg": {
-            "ok": ffmpeg_ok,
-            "message": "FFmpeg encontrado." if ffmpeg_ok else "FFmpeg nao encontrado.",
-        },
+        "id": record.id,
+        "camera_id": record.camera_id,
+        "seconds": record.seconds,
+        "label": record.label,
+        "status": record.status,
+        "message": record.message,
+        "created_at": record.created_at.isoformat(),
+        "updated_at": record.updated_at.isoformat(),
     }
 
 
+def _log(db: Session, source: str, level: str, message: str, camera_id: str | None = None) -> None:
+    db.add(
+        SystemLog(
+            source=source,
+            level=level,
+            camera_id=camera_id,
+            message=truncate_text(message, 500) or "Evento registrado.",
+        )
+    )
+
+
+@router.get("/health")
+def health():
+    return {"ok": True, "message": "Sertao Replay API online"}
+
+
 @router.get("/cameras")
-def list_cameras(db: Session = Depends(get_db), _: None = Depends(require_operator)):
+def list_cameras(db: Session = Depends(get_db)):
     return camera_service.list_cameras(db)
-
-
-@router.get("/admin/cameras")
-def list_admin_cameras(db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    return camera_service.list_all_cameras(db)
 
 
 @router.post("/cameras")
 def save_camera(camera: CameraCreate, db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    return camera_service.save_camera(db, camera)
-
-
-@router.get("/cameras/{camera_id}")
-def get_camera(camera_id: str, db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    try:
-        camera = camera_service.get_camera(db, camera_id, include_disabled=True)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    return PublicCamera(
-        id=camera.id,
-        name=camera.name,
-        status=camera.status,
-        enabled=camera.enabled,
-        notes=camera.notes,
-        created_at=camera.created_at,
-        updated_at=camera.updated_at,
-    )
-
-
-@router.get("/admin/cameras/{camera_id}")
-def get_admin_camera(camera_id: str, db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    try:
-        return camera_service.get_camera(db, camera_id, include_disabled=True)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-@router.put("/cameras/{camera_id}")
-def update_camera(
-    camera_id: str,
-    camera: CameraCreate,
-    db: Session = Depends(get_db),
-    _: None = Depends(require_operator),
-):
-    if camera.id != camera_id:
-        raise HTTPException(status_code=400, detail="O ID da URL deve ser igual ao ID do corpo.")
-
-    return camera_service.save_camera(db, camera)
-
-
-@router.patch("/cameras/{camera_id}/enabled")
-def set_camera_enabled(
-    camera_id: str,
-    enabled: bool,
-    db: Session = Depends(get_db),
-    _: None = Depends(require_operator),
-):
-    try:
-        return camera_service.set_camera_enabled(db, camera_id, enabled)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-@router.delete("/cameras/{camera_id}")
-def delete_camera(camera_id: str, db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    try:
-        ffmpeg_recorder.stop(camera_id)
-        return camera_service.delete_camera(db, camera_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-@router.post("/cameras/{camera_id}/test")
-def test_camera(camera_id: str, db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    try:
-        camera = camera_service.get_camera(db, camera_id, include_disabled=True)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    camera_service.update_status(db, camera_id, "connecting")
-    result = ffmpeg_recorder.capture_snapshot(camera)
-    camera_service.update_status(db, camera_id, result.get("status", "error"))
-
-    if result.get("ok"):
-        result["snapshot_url"] = f"/api/cameras/{camera_id}/snapshot?ts={int(time.time())}"
-
-    return result
-
-
-@router.get("/cameras/{camera_id}/snapshot")
-def get_camera_snapshot(camera_id: str, db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    try:
-        camera = camera_service.get_camera(db, camera_id, include_disabled=True)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    result = ffmpeg_recorder.capture_snapshot(camera)
-    camera_service.update_status(db, camera_id, result.get("status", "error"))
-    if not result.get("ok"):
-        raise HTTPException(status_code=502, detail=result)
-
-    return FileResponse(
-        path=result["file_path"],
-        media_type="image/jpeg",
-        filename=f"{camera_id}.jpg",
-        headers={"Cache-Control": "no-store"},
-    )
-
-
-@router.get("/cameras/{camera_id}/gstreamer-pipeline")
-def get_gstreamer_pipeline(camera_id: str, db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    try:
-        camera = camera_service.get_camera(db, camera_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    return gstreamer_service.test_pipeline(camera)
-
-
-@router.post("/recorders/{camera_id}/start")
-def start_recorder(camera_id: str, db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    try:
-        camera = camera_service.get_camera(db, camera_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    result = ffmpeg_recorder.start(camera)
-    camera_service.update_status(db, camera_id, result.get("status", "error"))
-    return result
-
-
-@router.post("/recorders/{camera_id}/stop")
-def stop_recorder(camera_id: str, db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    result = ffmpeg_recorder.stop(camera_id)
-    camera_service.update_status(db, camera_id, "offline")
-    return result
-
-
-@router.get("/recorders/status")
-def recorder_status(db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    statuses = ffmpeg_recorder.status()
-    for camera_id, status in statuses.items():
-        camera_service.update_status(db, camera_id, status.get("status", "unknown"))
-    return statuses
-
-
-@router.post("/replay")
-def create_replay(
-    payload: ReplayRequest,
-    db: Session = Depends(get_db),
-    _: None = Depends(require_operator),
-):
-    try:
-        camera = camera_service.get_camera(db, payload.camera_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    title = (payload.label or f"Replay {payload.seconds}s").strip() or f"Replay {payload.seconds}s"
-    replay_record = Replay(
-        camera_id=payload.camera_id,
-        camera_name=camera.name,
-        title=title,
-        duration=payload.seconds,
-        status="processing",
-    )
-    db.add(replay_record)
+    record = camera_service.save_camera(db, camera)
+    _log(db, "backend", "info", f"Camera cadastrada ou atualizada: {record.id}", record.id)
     db.commit()
-    db.refresh(replay_record)
+    return record
 
+
+@router.post("/cameras/{camera_id}/status")
+def update_camera_status(
+    camera_id: str,
+    status: str = Form(...),
+    message: str | None = Form(default=None),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
     try:
-        result = replay_service.create_replay(
-            camera_id=payload.camera_id,
-            seconds=payload.seconds,
-            label=payload.label,
-            source_url=camera.rtsp_url,
-        )
-    except Exception as exc:
-        logger.exception("Erro inesperado ao criar replay. camera_id=%s", payload.camera_id)
-        result = {
-            "ok": False,
-            "message": truncate_text(str(exc)) or "Erro inesperado ao criar replay.",
-            "file_path": None,
-        }
+        camera_service.get_camera(db, camera_id, include_disabled=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    if result.get("ok"):
-        replay_record.status = "ready"
-        replay_record.video_url = result.get("video_url") or result.get("download_url")
-        replay_record.file_name = result.get("file_name")
-        replay_record.file_path = result.get("file_path")
-        replay_record.source = result.get("source")
-        event_status = "success"
-    else:
-        replay_record.status = "error"
-        event_status = "error"
-
-    event = ReplayEvent(
-        camera_id=payload.camera_id,
-        action="replay",
-        seconds=payload.seconds,
-        file_path=result.get("file_path"),
-        status=event_status,
-    )
-    db.add(event)
+    camera_service.update_status(db, camera_id, status)
+    _log(db, "capture-server", "info", message or f"Camera {camera_id}: {status}", camera_id)
     db.commit()
-    db.refresh(replay_record)
-
-    logger.info(
-        "Replay finalizado. camera_id=%s replay_id=%s status=%s",
-        payload.camera_id,
-        replay_record.id,
-        replay_record.status,
-    )
-
-    return {
-        **result,
-        "replay_id": replay_record.id,
-        "replay": replay_service.to_response(replay_record),
-    }
+    return {"ok": True, "camera_id": camera_id, "status": status}
 
 
 @router.get("/replays")
 def list_replays(db: Session = Depends(get_db)):
     return replay_service.list_replays(db)
+
+
+@router.post("/replays")
+def create_replay_request_from_replays(
+    payload: ReplayRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
+    return create_replay_request(payload, db)
+
+
+@router.post("/replay")
+def create_legacy_replay_request(
+    payload: ReplayRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
+    return create_replay_request(payload, db)
+
+
+@router.post("/replays/upload")
+def upload_replay(
+    camera_id: str = Form(...),
+    seconds: int = Form(default=15),
+    label: str | None = Form(default=None),
+    request_id: int | None = Form(default=None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
+    if not file.filename.lower().endswith(".mp4"):
+        raise HTTPException(status_code=400, detail="Envie um arquivo MP4.")
+
+    try:
+        camera = camera_service.get_camera(db, camera_id, include_disabled=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    record = replay_service.save_uploaded_replay(
+        db=db,
+        file_object=file.file,
+        original_filename=file.filename,
+        camera_id=camera_id,
+        camera_name=camera.name,
+        seconds=seconds,
+        label=label,
+    )
+
+    if request_id:
+        request_record = db.get(ReplayRequestQueue, request_id)
+        if request_record:
+            request_record.status = "completed"
+            request_record.completed_at = datetime.utcnow()
+            request_record.message = f"Replay publicado: {record.file_name}"
+
+    db.add(
+        ReplayEvent(
+            camera_id=camera_id,
+            action="upload",
+            seconds=seconds,
+            file_path=record.file_path,
+            status="success",
+        )
+    )
+    _log(db, "capture-server", "info", f"Replay recebido: {record.file_name}", camera_id)
+    db.commit()
+
+    response = replay_service.to_response(record)
+    return {
+        "ok": True,
+        "message": "Replay publicado com sucesso.",
+        "replay_id": record.id,
+        "request_id": request_id,
+        "video_url": response["video_url"],
+        "download_url": response["download_url"],
+        "replay": response,
+    }
 
 
 @router.get("/replays/file/{filename}")
@@ -302,18 +196,128 @@ def get_replay_file(filename: str):
     return FileResponse(path=file_path, media_type="video/mp4", filename=filename)
 
 
-@router.get("/events")
-def list_events(db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    events = db.query(ReplayEvent).order_by(ReplayEvent.created_at.desc()).limit(50).all()
+@router.post("/replay-requests")
+def create_replay_request(
+    payload: ReplayRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
+    try:
+        camera = camera_service.get_camera(db, payload.camera_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    record = ReplayRequestQueue(
+        camera_id=camera.id,
+        seconds=payload.seconds,
+        label=payload.label,
+        status="pending",
+        message="Aguardando capture-server.",
+    )
+    db.add(record)
+    db.add(
+        ReplayEvent(
+            camera_id=camera.id,
+            action="request",
+            seconds=payload.seconds,
+            status="pending",
+        )
+    )
+    _log(db, "frontend", "info", f"Solicitacao de replay criada: {payload.seconds}s", camera.id)
+    db.commit()
+    db.refresh(record)
+    logger.info("Solicitacao de replay criada. request_id=%s camera_id=%s", record.id, camera.id)
+    return {"ok": True, "message": "Solicitacao enviada ao capture-server.", "request": _request_response(record)}
+
+
+@router.get("/replay-requests/pending")
+def list_pending_replay_requests(
+    camera_id: str | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
+    stale_before = datetime.utcnow() - timedelta(minutes=2)
+    stale = (
+        db.query(ReplayRequestQueue)
+        .filter(ReplayRequestQueue.status == "processing")
+        .filter(ReplayRequestQueue.claimed_at < stale_before)
+        .all()
+    )
+    for record in stale:
+        record.status = "pending"
+        record.message = "Reenfileirado apos timeout do capture-server."
+        record.claimed_at = None
+
+    query = db.query(ReplayRequestQueue).filter(ReplayRequestQueue.status == "pending")
+    if camera_id:
+        query = query.filter(ReplayRequestQueue.camera_id == camera_id)
+
+    records = query.order_by(ReplayRequestQueue.created_at.asc()).limit(5).all()
+    now = datetime.utcnow()
+    for record in records:
+        record.status = "processing"
+        record.claimed_at = now
+        record.message = "Solicitacao capturada pelo capture-server."
+
+    db.commit()
+    for record in records:
+        db.refresh(record)
+
+    return [_request_response(record) for record in records]
+
+
+@router.post("/replay-requests/{request_id}/fail")
+def fail_replay_request(
+    request_id: int,
+    message: str = Form(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
+    record = db.get(ReplayRequestQueue, request_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Solicitacao nao encontrada.")
+
+    record.status = "failed"
+    record.completed_at = datetime.utcnow()
+    record.message = truncate_text(message, 500) or "Falha ao gerar replay."
+    db.add(
+        ReplayEvent(
+            camera_id=record.camera_id,
+            action="request_failed",
+            seconds=record.seconds,
+            status="error",
+        )
+    )
+    _log(db, "capture-server", "error", record.message, record.camera_id)
+    db.commit()
+    return {"ok": True, "request": _request_response(record)}
+
+
+@router.get("/logs")
+def list_logs(db: Session = Depends(get_db), _: None = Depends(require_operator)):
+    records = db.query(SystemLog).order_by(SystemLog.created_at.desc()).limit(100).all()
     return [
         {
-            "id": event.id,
-            "camera_id": event.camera_id,
-            "action": event.action,
-            "seconds": event.seconds,
-            "file_path": event.file_path,
-            "status": event.status,
-            "created_at": event.created_at.isoformat(),
+            "id": record.id,
+            "source": record.source,
+            "level": record.level,
+            "camera_id": record.camera_id,
+            "message": record.message,
+            "created_at": record.created_at.isoformat(),
         }
-        for event in events
+        for record in records
     ]
+
+
+@router.post("/logs")
+def create_log(
+    source: str = Form(default="capture-server"),
+    level: str = Form(default="info"),
+    message: str = Form(...),
+    camera_id: str | None = Form(default=None),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
+    _log(db, source, level, message, camera_id)
+    db.commit()
+    return {"ok": True}

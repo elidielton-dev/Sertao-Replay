@@ -10,4 +10,4 @@ if (!(Test-Path ".env")) {
 python -c "from app.db.init_db import init_db; init_db()"
 
 Write-Host "Instalacao concluida."
-Write-Host "Inicie o backend e cadastre as cameras pelo painel /admin/."
+Write-Host "Inicie o backend. As cameras sao registradas pelo capture-server local."

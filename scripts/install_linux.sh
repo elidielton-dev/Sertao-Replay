@@ -13,4 +13,4 @@ fi
 python -c "from app.db.init_db import init_db; init_db()"
 
 echo "Instalacao concluida."
-echo "Inicie o backend e cadastre as cameras pelo painel /admin/."
+echo "Inicie o backend. As cameras sao registradas pelo capture-server local."

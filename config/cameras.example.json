@@ -1,8 +1,8 @@
 [
   {
-    "id": "cam1",
-    "name": "Camera Campo 1",
-    "rtsp_url": "rtsp://54.207.185.74:8554/camera1",
-    "enabled": true
+    "id": "campo-01",
+    "name": "Campo 01",
+    "enabled": true,
+    "notes": "Camera registrada pelo capture-server local da arena."
   }
 ]
