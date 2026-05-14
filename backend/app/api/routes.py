@@ -150,10 +150,16 @@ def recorder_status():
 
 @router.post("/replay")
 def create_replay(payload: ReplayRequest, db: Session = Depends(get_db)):
+    try:
+        camera = camera_service.get_camera(db, payload.camera_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
     result = replay_service.create_replay(
         camera_id=payload.camera_id,
         seconds=payload.seconds,
         label=payload.label,
+        source_url=camera.rtsp_url,
     )
 
     event = ReplayEvent(

@@ -18,6 +18,20 @@ function replayFileUrl(fileName) {
   return apiUrl(`/replays/file/${encodeURIComponent(fileName)}`);
 }
 
+function downloadReplayFile(fileName) {
+  if (!fileName) {
+    return;
+  }
+
+  const link = document.createElement("a");
+  link.href = replayFileUrl(fileName);
+  link.download = fileName;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 function redactRtspText(value) {
   return String(value).replace(/rtsp:\/\/([^:@/\s]+):([^@/\s]+)@/gi, "rtsp://***:***@");
 }
@@ -174,6 +188,10 @@ async function createReplay(seconds) {
     });
     log(`Replay ${seconds}s solicitado`, data);
     renderReplayResult(data);
+    if (data?.ok && data.file_name) {
+      downloadReplayFile(data.file_name);
+      log("Download do replay iniciado", { file_name: data.file_name });
+    }
     await loadReplays();
   } catch (error) {
     log("Erro ao gerar replay", { error: error.message });

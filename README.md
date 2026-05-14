@@ -100,6 +100,25 @@ Exemplo:
 ]
 ```
 
+## Camera via MediaMTX na VPS
+
+Neste setup, o MediaMTX roda na VPS e recebe o stream publicado pelo seu Windows.
+
+- URL para o backend gravar/replay: `rtsp://54.207.185.74:8554/camera1`
+- URL para assistir no navegador via HLS/WebRTC: `http://54.207.185.74:8888/camera1/`
+
+No PowerShell do Windows, publique a camera local para a VPS:
+
+```powershell
+.\scripts\push_camera_to_mediamtx.ps1 -LocalCameraUrl "rtsp://usuario:senha@IP_DA_CAMERA:554/stream1"
+```
+
+Comando FFmpeg equivalente:
+
+```powershell
+ffmpeg -rtsp_transport tcp -i "rtsp://usuario:senha@IP_DA_CAMERA:554/stream1" -an -c:v copy -f rtsp -rtsp_transport tcp "rtsp://54.207.185.74:8554/camera1"
+```
+
 ## Rodar o backend
 
 ```bash

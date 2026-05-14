@@ -27,29 +27,116 @@ class ReplayService:
             key=lambda p: p.stat().st_mtime,
         )[-segment_count:]
 
-    def create_replay(self, camera_id: str, seconds: int = 15, label: str | None = None) -> dict:
-        ffmpeg = resolve_command("ffmpeg")
-        if not ffmpeg:
-            return {"ok": False, "message": "FFmpeg nao encontrado.", "file_path": None}
-
-        segments = self._latest_segments(camera_id, seconds)
-        if not segments:
-            return {
-                "ok": False,
-                "message": "Nenhum segmento encontrado. Inicie a gravacao e aguarde alguns segundos.",
-                "file_path": None,
-            }
-
+    def _replay_filename(self, camera_id: str, seconds: int, label: str | None) -> str:
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         safe_label = ""
         if label:
             cleaned_label = re.sub(r"[^A-Za-z0-9_-]+", "_", label.strip()).strip("_")
             safe_label = f"_{cleaned_label}" if cleaned_label else ""
 
-        replay_file = self.settings.replay_path / f"{camera_id}_replay_{seconds}s_{timestamp}{safe_label}.mp4"
+        return f"{camera_id}_replay_{seconds}s_{timestamp}{safe_label}.mp4"
+
+    def _response_for_file(self, replay_file: Path, seconds: int, message: str, **extra: object) -> dict:
+        return {
+            "ok": True,
+            "message": message,
+            "file_path": str(replay_file),
+            "file_name": replay_file.name,
+            "download_url": f"/api/replays/file/{replay_file.name}",
+            "seconds": seconds,
+            **extra,
+        }
+
+    def _record_clip_from_source(
+        self,
+        ffmpeg: str,
+        source_url: str,
+        replay_file: Path,
+        seconds: int,
+        timeout_seconds: int,
+    ) -> tuple[bool, str]:
+        command = [
+            ffmpeg,
+            "-hide_banner",
+            "-y",
+            "-rtsp_transport",
+            "tcp",
+            "-fflags",
+            "+genpts+discardcorrupt",
+            "-err_detect",
+            "ignore_err",
+            "-use_wallclock_as_timestamps",
+            "1",
+            "-i",
+            source_url,
+            "-t",
+            str(seconds),
+            "-an",
+            "-c:v",
+            "copy",
+            "-movflags",
+            "+faststart",
+            str(replay_file),
+        ]
+
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=timeout_seconds,
+            )
+        except subprocess.TimeoutExpired:
+            return False, "Tempo esgotado ao gravar o replay direto da camera."
+
+        if result.returncode == 0 and replay_file.exists() and replay_file.stat().st_size > 0:
+            return True, ""
+
+        return False, result.stderr or "Erro ao gravar o replay direto da camera."
+
+    def create_replay(
+        self,
+        camera_id: str,
+        seconds: int = 15,
+        label: str | None = None,
+        source_url: str | None = None,
+    ) -> dict:
+        ffmpeg = resolve_command("ffmpeg")
+        if not ffmpeg:
+            return {"ok": False, "message": "FFmpeg nao encontrado.", "file_path": None}
+
+        replay_file = self.settings.replay_path / self._replay_filename(camera_id, seconds, label)
         replay_file.parent.mkdir(parents=True, exist_ok=True)
 
-        concat_file = self.settings.replay_path / f"concat_{camera_id}_{timestamp}.txt"
+        segments = self._latest_segments(camera_id, seconds)
+        if not segments:
+            if source_url:
+                ok, error = self._record_clip_from_source(
+                    ffmpeg=ffmpeg,
+                    source_url=source_url,
+                    replay_file=replay_file,
+                    seconds=seconds,
+                    timeout_seconds=seconds + 20,
+                )
+                if ok:
+                    return self._response_for_file(
+                        replay_file,
+                        seconds,
+                        "Replay salvo direto da camera.",
+                        segments=0,
+                        source="camera",
+                    )
+
+            return {
+                "ok": False,
+                "message": error
+                if source_url
+                else "Nenhum segmento encontrado. Inicie a gravacao e aguarde alguns segundos.",
+                "file_path": None,
+            }
+
+        concat_file = self.settings.replay_path / f"concat_{camera_id}_{int(time.time())}.txt"
         concat_file.write_text(
             "\n".join([f"file '{segment.resolve().as_posix()}'" for segment in segments]),
             encoding="utf-8",
@@ -84,15 +171,13 @@ class ReplayService:
                 "file_path": None,
             }
 
-        return {
-            "ok": True,
-            "message": "Replay gerado com sucesso.",
-            "file_path": str(replay_file),
-            "file_name": replay_file.name,
-            "download_url": f"/api/replays/file/{replay_file.name}",
-            "seconds": seconds,
-            "segments": len(segments),
-        }
+        return self._response_for_file(
+            replay_file,
+            seconds,
+            "Replay gerado com sucesso.",
+            segments=len(segments),
+            source="buffer",
+        )
 
     def list_replays(self) -> list[dict]:
         self.settings.replay_path.mkdir(parents=True, exist_ok=True)
