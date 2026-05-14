@@ -42,6 +42,7 @@ class CaptureServer:
         self.operator_token = env("OPERATOR_TOKEN")
         self.camera_id = env("CAMERA_ID")
         self.local_rtsp_url = env("LOCAL_RTSP_URL")
+        self.rtsp_transport = os.getenv("RTSP_TRANSPORT", "tcp").strip().lower() or "tcp"
         self.default_replay_seconds = int(os.getenv("DEFAULT_REPLAY_SECONDS", "15"))
         self.segment_time_seconds = int(os.getenv("SEGMENT_TIME_SECONDS", "2"))
         self.segment_wrap_count = int(os.getenv("SEGMENT_WRAP_COUNT", "120"))
@@ -96,7 +97,7 @@ class CaptureServer:
             "-loglevel",
             "warning",
             "-rtsp_transport",
-            "tcp",
+            self.rtsp_transport,
             "-fflags",
             "+genpts+discardcorrupt",
             "-err_detect",
