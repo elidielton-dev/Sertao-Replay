@@ -15,6 +15,7 @@ class CameraConfig(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(120))
+    rtsp_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="unknown", index=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

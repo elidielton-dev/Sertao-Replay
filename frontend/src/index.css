@@ -461,6 +461,14 @@ textarea {
   color: #b5c2bc;
 }
 
+.rtsp-preview {
+  max-width: 100%;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .camera-row .status-pill {
   min-width: 104px;
   padding: 8px 10px;

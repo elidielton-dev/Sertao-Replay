@@ -9,11 +9,11 @@ from pathlib import Path
 import requests
 
 
-def env(name: str, default: str | None = None) -> str:
+def env(name: str, default: str | None = None, required: bool = True) -> str:
     value = os.getenv(name, default)
-    if value is None or value == "":
+    if required and (value is None or value == ""):
         raise RuntimeError(f"Variavel obrigatoria ausente: {name}")
-    return value
+    return value or ""
 
 
 def load_dotenv() -> None:
@@ -41,7 +41,7 @@ class CaptureServer:
         self.backend_api_url = env("BACKEND_API_URL").rstrip("/")
         self.operator_token = env("OPERATOR_TOKEN")
         self.camera_id = env("CAMERA_ID")
-        self.local_rtsp_url = env("LOCAL_RTSP_URL")
+        self.local_rtsp_url = env("LOCAL_RTSP_URL", required=False)
         self.rtsp_transport = os.getenv("RTSP_TRANSPORT", "tcp").strip().lower() or "tcp"
         self.replay_video_codec = os.getenv("REPLAY_VIDEO_CODEC", "libx264").strip() or "libx264"
         self.default_replay_seconds = int(os.getenv("DEFAULT_REPLAY_SECONDS", "15"))
@@ -66,8 +66,9 @@ class CaptureServer:
 
     def run(self) -> None:
         logging.info("Capture-server iniciado para camera_id=%s", self.camera_id)
-        logging.info("RTSP local configurado: %s", redact(self.local_rtsp_url))
         self.register_camera()
+        self.load_remote_camera_config()
+        logging.info("RTSP local configurado: %s", redact(self.local_rtsp_url))
         self.send_log("info", "Capture-server iniciado.")
         self.start_buffer(clear_buffer=True)
 
@@ -84,6 +85,24 @@ class CaptureServer:
             "notes": os.getenv("CAMERA_NOTES", "Camera operada pelo capture-server local."),
         }
         self.post_json("/cameras", payload)
+
+    def load_remote_camera_config(self) -> None:
+        if self.local_rtsp_url:
+            return
+
+        try:
+            response = self.session.get(
+                f"{self.backend_api_url}/cameras/{self.camera_id}/config",
+                timeout=20,
+            )
+            response.raise_for_status()
+            camera = response.json()
+        except requests.RequestException as exc:
+            raise RuntimeError(f"Nao foi possivel carregar configuracao da camera no backend: {exc}") from exc
+
+        self.local_rtsp_url = camera.get("rtsp_url") or ""
+        if not self.local_rtsp_url:
+            raise RuntimeError("Camera sem rtsp_url. Configure pelo /admin ou LOCAL_RTSP_URL no .env.")
 
     def start_buffer(self, clear_buffer: bool = False) -> None:
         if clear_buffer:

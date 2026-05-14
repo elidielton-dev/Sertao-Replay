@@ -45,6 +45,7 @@ class CameraService:
 
         if record:
             record.name = camera.name
+            record.rtsp_url = camera.rtsp_url
             record.enabled = camera.enabled
             record.notes = camera.notes
             message = "Camera atualizada no banco de dados."
@@ -106,6 +107,7 @@ class CameraService:
         return Camera(
             id=record.id,
             name=record.name,
+            rtsp_url=record.rtsp_url,
             enabled=record.enabled,
             status=record.status,
             notes=record.notes,

@@ -73,6 +73,23 @@ def list_cameras(db: Session = Depends(get_db)):
     return camera_service.list_cameras(db)
 
 
+@router.get("/cameras/admin")
+def list_admin_cameras(db: Session = Depends(get_db), _: None = Depends(require_operator)):
+    return camera_service.list_all_cameras(db)
+
+
+@router.get("/cameras/{camera_id}/config")
+def get_camera_config(
+    camera_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
+    try:
+        return camera_service.get_camera(db, camera_id, include_disabled=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.post("/cameras")
 def save_camera(camera: CameraCreate, db: Session = Depends(get_db), _: None = Depends(require_operator)):
     record = camera_service.save_camera(db, camera)

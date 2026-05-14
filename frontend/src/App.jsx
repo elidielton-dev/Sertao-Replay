@@ -421,6 +421,7 @@ function AdminPage() {
   const [form, setForm] = useState({
     id: "",
     name: "",
+    rtsp_url: "",
     enabled: true,
     notes: "",
   });
@@ -434,11 +435,12 @@ function AdminPage() {
   }
 
   function resetForm() {
-    setForm({ id: "", name: "", enabled: true, notes: "" });
+    setForm({ id: "", name: "", rtsp_url: "", enabled: true, notes: "" });
   }
 
   async function loadCameras() {
-    const data = await apiRequest("/cameras");
+    const path = tokenValue() ? "/cameras/admin" : "/cameras";
+    const data = await apiRequest(path, tokenValue() ? { token: tokenValue() } : {});
     setCameras(Array.isArray(data) ? data : []);
   }
 
@@ -490,6 +492,7 @@ function AdminPage() {
     setForm({
       id: camera.id,
       name: camera.name,
+      rtsp_url: camera.rtsp_url || "",
       enabled: Boolean(camera.enabled),
       notes: camera.notes || "",
     });
@@ -505,6 +508,7 @@ function AdminPage() {
     const payload = {
       id: form.id.trim(),
       name: form.name.trim(),
+      rtsp_url: form.rtsp_url.trim(),
       enabled: form.enabled,
       notes: form.notes.trim() || null,
     };
@@ -580,6 +584,15 @@ function AdminPage() {
               value={form.name}
               onChange={(event) => updateForm("name", event.target.value)}
               placeholder="Campo 01"
+              required
+            />
+
+            <label htmlFor="adminCameraRtsp">URL RTSP</label>
+            <input
+              id="adminCameraRtsp"
+              value={form.rtsp_url}
+              onChange={(event) => updateForm("rtsp_url", event.target.value)}
+              placeholder="rtsp://usuario:senha@192.168.0.6:554/onvif1"
               required
             />
 
@@ -666,6 +679,7 @@ function AdminPage() {
                   <span>
                     <strong>{camera.name}</strong>
                     <small>{camera.id}</small>
+                    {camera.rtsp_url ? <small className="rtsp-preview">{camera.rtsp_url}</small> : null}
                   </span>
                   <span className={`status-pill status-${camera.status || "unknown"}`}>
                     {camera.status || "unknown"}

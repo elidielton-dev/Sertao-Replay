@@ -18,7 +18,14 @@ def init_db() -> None:
 
 
 def _run_lightweight_migrations() -> None:
-    if engine.url.get_backend_name() != "sqlite":
+    backend_name = engine.url.get_backend_name()
+    if backend_name.startswith("postgres"):
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE cameras ADD COLUMN IF NOT EXISTS rtsp_url VARCHAR(500)"))
+        logger.info("Migracao verificada: cameras.rtsp_url.")
+        return
+
+    if backend_name != "sqlite":
         return
 
     with engine.begin() as connection:
@@ -39,3 +46,7 @@ def _run_lightweight_migrations() -> None:
         if "notes" not in camera_columns:
             connection.execute(text("ALTER TABLE cameras ADD COLUMN notes TEXT"))
             logger.info("Migracao aplicada: cameras.notes.")
+
+        if "rtsp_url" not in camera_columns:
+            connection.execute(text("ALTER TABLE cameras ADD COLUMN rtsp_url VARCHAR(500)"))
+            logger.info("Migracao aplicada: cameras.rtsp_url.")
