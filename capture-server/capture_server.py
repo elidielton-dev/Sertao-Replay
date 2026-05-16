@@ -53,6 +53,8 @@ class CaptureServer:
         self.output_dir = self.storage_root / "replays"
         self.ffmpeg = shutil.which(os.getenv("FFMPEG_BIN", "ffmpeg"))
         self.process: subprocess.Popen | None = None
+        self.ffmpeg_stderr = None
+        self.ffmpeg_log_path = self.storage_root / "logs" / f"ffmpeg_{self.camera_id}.log"
         self.last_reported_status: str | None = None
         self.last_status_report_at = 0.0
         self.session = requests.Session()
@@ -63,6 +65,7 @@ class CaptureServer:
 
         self.buffer_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.ffmpeg_log_path.parent.mkdir(parents=True, exist_ok=True)
 
     def run(self) -> None:
         logging.info("Capture-server iniciado para camera_id=%s", self.camera_id)
@@ -140,15 +143,27 @@ class CaptureServer:
             pattern,
         ]
 
-        self.process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if self.ffmpeg_stderr:
+            self.ffmpeg_stderr.close()
+        self.ffmpeg_stderr = self.ffmpeg_log_path.open("ab")
+        self.ffmpeg_stderr.write(f"\n--- buffer start {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n".encode("utf-8"))
+        self.ffmpeg_stderr.flush()
+
+        self.process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=self.ffmpeg_stderr)
         self.update_camera_status("connecting", "Conectando na camera local.")
         self.send_log("info", "FFmpeg iniciado para manter buffer local.")
         logging.info("FFmpeg iniciado para manter buffer local.")
 
     def ensure_buffer_running(self) -> None:
         if self.process and self.process.poll() is None:
-            status = "recording" if self.latest_segment_mtime() else "connecting"
-            self.update_camera_status(status, "Buffer local ativo.")
+            latest_mtime = self.latest_segment_mtime()
+            if latest_mtime:
+                status = "recording"
+                message = "Buffer local ativo."
+            else:
+                status = "connecting"
+                message = "FFmpeg ativo, mas ainda sem segmentos de video."
+            self.update_camera_status(status, message)
             return
 
         exit_code = self.process.returncode if self.process else None
@@ -241,14 +256,26 @@ class CaptureServer:
 
     def latest_segments(self, seconds: int) -> list[Path]:
         count = max(1, int(seconds / self.segment_time_seconds) + 3)
-        segments = list(self.buffer_dir.glob("segment_*.ts"))
+        segments = [
+            segment
+            for segment in self.buffer_dir.glob("segment_*.ts")
+            if segment.is_file() and segment.stat().st_size > 0 and self.is_recent_segment(segment)
+        ]
         return sorted(segments, key=lambda path: path.stat().st_mtime)[-count:]
 
     def latest_segment_mtime(self) -> float | None:
-        segments = list(self.buffer_dir.glob("segment_*.ts"))
+        segments = [
+            segment
+            for segment in self.buffer_dir.glob("segment_*.ts")
+            if segment.is_file() and segment.stat().st_size > 0 and self.is_recent_segment(segment)
+        ]
         if not segments:
             return None
         return max(segment.stat().st_mtime for segment in segments)
+
+    def is_recent_segment(self, segment: Path) -> bool:
+        max_age = max(self.segment_time_seconds * 4, 15)
+        return time.time() - segment.stat().st_mtime <= max_age
 
     def upload_replay(self, output_file: Path, request_id: int, seconds: int, label: str | None) -> None:
         with output_file.open("rb") as stream:
