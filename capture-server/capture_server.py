@@ -43,6 +43,8 @@ class CaptureServer:
         self.camera_id = env("CAMERA_ID")
         self.local_rtsp_url = env("LOCAL_RTSP_URL", required=False)
         self.rtsp_transport = os.getenv("RTSP_TRANSPORT", "tcp").strip().lower() or "tcp"
+        self.buffer_video_codec = os.getenv("BUFFER_VIDEO_CODEC", "libx264").strip() or "libx264"
+        self.buffer_fps = int(os.getenv("BUFFER_FPS", "30"))
         self.replay_video_codec = os.getenv("REPLAY_VIDEO_CODEC", "libx264").strip() or "libx264"
         self.default_replay_seconds = int(os.getenv("DEFAULT_REPLAY_SECONDS", "15"))
         self.segment_time_seconds = int(os.getenv("SEGMENT_TIME_SECONDS", "2"))
@@ -130,18 +132,41 @@ class CaptureServer:
             "-i",
             self.local_rtsp_url,
             "-an",
-            "-c:v",
-            "copy",
-            "-f",
-            "segment",
-            "-segment_time",
-            str(self.segment_time_seconds),
-            "-segment_wrap",
-            str(self.segment_wrap_count),
-            "-reset_timestamps",
-            "1",
-            pattern,
         ]
+
+        if self.buffer_video_codec.lower() == "copy":
+            command.extend(["-c:v", "copy"])
+        else:
+            command.extend(
+                [
+                    "-vf",
+                    f"fps={self.buffer_fps},setpts=N/({self.buffer_fps}*TB)",
+                    "-c:v",
+                    self.buffer_video_codec,
+                    "-preset",
+                    "veryfast",
+                    "-tune",
+                    "zerolatency",
+                    "-pix_fmt",
+                    "yuv420p",
+                ]
+            )
+
+        command.extend(
+            [
+                "-f",
+                "segment",
+                "-segment_format",
+                "mpegts",
+                "-segment_time",
+                str(self.segment_time_seconds),
+                "-segment_wrap",
+                str(self.segment_wrap_count),
+                "-reset_timestamps",
+                "1",
+                pattern,
+            ]
+        )
 
         if self.ffmpeg_stderr:
             self.ffmpeg_stderr.close()

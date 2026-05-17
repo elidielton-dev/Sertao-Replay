@@ -217,7 +217,6 @@ def get_replay_file(filename: str):
 def create_replay_request(
     payload: ReplayRequest,
     db: Session = Depends(get_db),
-    _: None = Depends(require_operator),
 ):
     try:
         camera = camera_service.get_camera(db, payload.camera_id)

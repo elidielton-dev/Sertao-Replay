@@ -69,6 +69,8 @@ CAMERA_ID=campo-01
 LOCAL_RTSP_URL=rtsp://usuario:senha@192.168.0.6:554/onvif1
 OPERATOR_URL=https://sports-replay-mvp.vercel.app/teste
 RTSP_TRANSPORT=tcp
+BUFFER_VIDEO_CODEC=libx264
+BUFFER_FPS=30
 DEFAULT_REPLAY_SECONDS=15
 REPLAY_VIDEO_CODEC=libx264
 SEGMENT_TIME_SECONDS=2
@@ -96,8 +98,8 @@ Tambem e possivel manter a URL RTSP apenas no `capture-server\.env` usando `LOCA
 
 1. O `capture-server` abre a camera RTSP com FFmpeg.
 2. Ele mantem um buffer circular local em `capture-server\storage\buffer`.
-3. O operador clica em `Replay 15s` na tela `/teste`.
-4. O frontend cria uma solicitacao no backend.
+3. O operador clica em `Replay 15s` na tela `/teste` ou aperta o botao fisico do Arduino.
+4. O frontend cria uma solicitacao no backend sem pedir token.
 5. O `capture-server` consulta `/api/replay-requests/pending`.
 6. Ele corta o MP4 localmente.
 7. Ele envia o arquivo para `/api/replays/upload`.

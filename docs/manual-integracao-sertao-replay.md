@@ -95,6 +95,8 @@ CAMERA_ID=campo-01
 LOCAL_RTSP_URL=rtsp://usuario:senha@192.168.0.6:554/onvif1
 OPERATOR_URL=https://sports-replay-mvp.vercel.app/teste
 RTSP_TRANSPORT=tcp
+BUFFER_VIDEO_CODEC=libx264
+BUFFER_FPS=30
 DEFAULT_REPLAY_SECONDS=15
 REPLAY_VIDEO_CODEC=libx264
 SEGMENT_TIME_SECONDS=2
@@ -165,7 +167,7 @@ Ao iniciar, ele:
 3. Abra `https://sports-replay-mvp.vercel.app/teste`.
 4. Confirme se a camera aparece como `recording`.
 5. Digite um titulo opcional, por exemplo `teste instalacao`.
-6. Clique em `Replay 15s`.
+6. Clique em `Replay 15s` ou aperte o botao fisico do Arduino.
 7. Aguarde alguns segundos.
 8. Abra a Home `https://sports-replay-mvp.vercel.app/`.
 9. O video deve aparecer na lista.
@@ -184,7 +186,7 @@ Antes do jogo:
 Durante o jogo:
 
 1. Mantenha a janela do capture-server aberta.
-2. Quando acontecer um lance, clique em `Replay 15s`.
+2. Quando acontecer um lance, clique em `Replay 15s` ou aperte o botao fisico do Arduino.
 3. Se quiser, preencha um titulo antes de clicar.
 4. Aguarde o video aparecer na Home.
 
@@ -284,7 +286,7 @@ Verifique:
 - [ ] URL RTSP testada.
 - [ ] Backend no Render online.
 - [ ] Frontend na Vercel online.
-- [ ] Token de operador salvo.
+- [ ] Token de operador configurado para admin e capture-server.
 - [ ] Camera cadastrada no admin.
 - [ ] `.env` do capture-server configurado.
 - [ ] FFmpeg instalado.

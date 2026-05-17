@@ -15,10 +15,16 @@ import {
   Settings,
   Video,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 const OPERATOR_TOKEN_KEY = "sertao_operator_token";
+const REPLAY_HOTKEY_SECONDS = {
+  F13: 10,
+  F14: 15,
+  F15: 30,
+  F16: 15,
+};
 
 function formatDate(value) {
   if (!value) {
@@ -184,7 +190,6 @@ function HomePage() {
 }
 
 function OperatorPage() {
-  const [token, setToken] = useState(() => localStorage.getItem(OPERATOR_TOKEN_KEY) || "");
   const [cameras, setCameras] = useState([]);
   const [cameraId, setCameraId] = useState("");
   const [label, setLabel] = useState("");
@@ -224,32 +229,25 @@ function OperatorPage() {
     return () => window.clearInterval(timer);
   }, []);
 
-  function saveToken(event) {
-    event.preventDefault();
-    if (token.trim()) {
-      localStorage.setItem(OPERATOR_TOKEN_KEY, token.trim());
-    } else {
-      localStorage.removeItem(OPERATOR_TOKEN_KEY);
+  const requestReplay = useCallback(async (seconds = 15) => {
+    if (busy) {
+      return;
     }
-    setMessage("Token de operador atualizado neste navegador.");
-  }
 
-  async function requestReplay() {
     if (!cameraId) {
       setMessage("Cadastre ou conecte uma camera antes de pedir replay.");
       return;
     }
 
     setBusy(true);
-    setMessage("Solicitacao enviada. Aguardando capture-server cortar e subir o MP4...");
+    setMessage(`Solicitacao de ${seconds}s enviada. Aguardando capture-server cortar e subir o MP4...`);
 
     try {
       const data = await apiRequest("/replay-requests", {
         method: "POST",
-        token: token.trim(),
         body: JSON.stringify({
           camera_id: cameraId,
-          seconds: 15,
+          seconds,
           label: label.trim() || null,
         }),
       });
@@ -261,7 +259,22 @@ function OperatorPage() {
     } finally {
       setBusy(false);
     }
-  }
+  }, [busy, cameraId, label]);
+
+  useEffect(() => {
+    function handleReplayHotkey(event) {
+      const seconds = REPLAY_HOTKEY_SECONDS[event.key];
+      if (!seconds || event.repeat) {
+        return;
+      }
+
+      event.preventDefault();
+      requestReplay(seconds);
+    }
+
+    window.addEventListener("keydown", handleReplayHotkey);
+    return () => window.removeEventListener("keydown", handleReplayHotkey);
+  }, [requestReplay]);
 
   const selectedCamera = cameras.find((camera) => camera.id === cameraId);
   const readyReplays = replays.filter((replay) => replay.status === "ready" && replay.video_url).slice(0, 5);
@@ -346,7 +359,7 @@ function OperatorPage() {
             placeholder="Gol, defesa, lance decisivo..."
           />
 
-          <button type="button" className="primary-action" onClick={requestReplay} disabled={busy || !cameraId}>
+          <button type="button" className="primary-action" onClick={() => requestReplay(15)} disabled={busy || !cameraId}>
             {busy ? <Loader2 className="spin" size={19} /> : <Video size={19} />}
             Replay 15s
           </button>
@@ -359,27 +372,17 @@ function OperatorPage() {
 
         <article className="operator-panel">
           <div className="panel-heading">
-            <KeyRound size={22} />
+            <CheckCircle2 size={22} />
             <div>
-              <h2>Acesso</h2>
-              <p>Token usado apenas nas chamadas de operador.</p>
+              <h2>Controle fisico</h2>
+              <p>Arduino Leonardo conectado para gerar replay sem token.</p>
             </div>
           </div>
 
-          <form onSubmit={saveToken} className="token-form">
-            <label htmlFor="operatorToken">Token de operador</label>
-            <input
-              id="operatorToken"
-              type="password"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-              placeholder="cole o token configurado no Render"
-            />
-            <button type="submit" className="secondary-action">
-              <CheckCircle2 size={18} />
-              Salvar token
-            </button>
-          </form>
+          <div className="status-box">
+            <strong>Replay 15s</strong>
+            <span>Botao fisico pronto para uso.</span>
+          </div>
         </article>
       </section>
 

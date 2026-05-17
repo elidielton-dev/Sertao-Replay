@@ -1,20 +1,20 @@
 #include <Keyboard.h>
 
 /*
-  Controlador físico para Sertão Replay
+  Controlador fisico para Sertao Replay
   Placa: Arduino Leonardo
 
-  Ligação:
-  - Um lado de cada botão no GND
+  Ligacao:
+  - Um lado de cada botao no GND
   - Outro lado nos pinos definidos abaixo
   - Usar INPUT_PULLUP
 
   Comandos enviados:
-  - Botão Replay 10s   -> F13
-  - Botão Replay 15s   -> F14
-  - Botão Replay 30s   -> F15
-  - Botão Salvar lance -> F16
-  - Botão Trocar câmera -> F17
+  - Botao Replay 10s   -> F13
+  - Botao Replay 15s   -> F14
+  - Botao Replay 30s   -> F15
+  - Botao Salvar lance -> F16
+  - Botao Trocar camera -> F17
 */
 
 const int BTN_REPLAY_10 = 2;
