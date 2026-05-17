@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import re
 import shutil
@@ -46,6 +47,7 @@ class CaptureServer:
         self.buffer_video_codec = os.getenv("BUFFER_VIDEO_CODEC", "libx264").strip() or "libx264"
         self.buffer_fps = int(os.getenv("BUFFER_FPS", "30"))
         self.replay_video_codec = os.getenv("REPLAY_VIDEO_CODEC", "libx264").strip() or "libx264"
+        self.fast_replay_copy = os.getenv("FAST_REPLAY_COPY", "true").strip().lower() not in {"0", "false", "no"}
         self.default_replay_seconds = int(os.getenv("DEFAULT_REPLAY_SECONDS", "15"))
         self.segment_time_seconds = int(os.getenv("SEGMENT_TIME_SECONDS", "2"))
         self.segment_wrap_count = int(os.getenv("SEGMENT_WRAP_COUNT", "120"))
@@ -54,6 +56,7 @@ class CaptureServer:
         self.buffer_dir = self.storage_root / "buffer" / self.camera_id
         self.output_dir = self.storage_root / "replays"
         self.ffmpeg = shutil.which(os.getenv("FFMPEG_BIN", "ffmpeg"))
+        self.ffprobe = shutil.which(os.getenv("FFPROBE_BIN", "ffprobe"))
         self.process: subprocess.Popen | None = None
         self.ffmpeg_stderr = None
         self.ffmpeg_log_path = self.storage_root / "logs" / f"ffmpeg_{self.camera_id}.log"
@@ -147,6 +150,12 @@ class CaptureServer:
                     "veryfast",
                     "-tune",
                     "zerolatency",
+                    "-g",
+                    str(max(1, self.buffer_fps * self.segment_time_seconds)),
+                    "-keyint_min",
+                    str(max(1, self.buffer_fps * self.segment_time_seconds)),
+                    "-sc_threshold",
+                    "0",
                     "-pix_fmt",
                     "yuv420p",
                 ]
@@ -259,34 +268,49 @@ class CaptureServer:
             "-t",
             str(seconds),
             "-an",
-            "-vf",
-            f"trim=duration={seconds},setpts=PTS-STARTPTS,fps=30",
-            "-c:v",
-            self.replay_video_codec,
-            "-preset",
-            "veryfast",
-            "-pix_fmt",
-            "yuv420p",
-            "-movflags",
-            "+faststart",
-            str(output_file),
         ]
+
+        if self.fast_replay_copy:
+            command.extend(["-c:v", "copy"])
+        else:
+            command.extend(
+                [
+                    "-vf",
+                    f"trim=duration={seconds},setpts=PTS-STARTPTS,fps=30",
+                    "-c:v",
+                    self.replay_video_codec,
+                    "-preset",
+                    "veryfast",
+                    "-pix_fmt",
+                    "yuv420p",
+                ]
+            )
+
+        command.extend(["-movflags", "+faststart", str(output_file)])
         result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=max(60, seconds + 30))
         concat_file.unlink(missing_ok=True)
 
         if result.returncode != 0 or not output_file.exists() or output_file.stat().st_size == 0:
             raise RuntimeError(redact(result.stderr) or "FFmpeg nao gerou o replay.")
 
+        duration = self.replay_duration(output_file)
+        if duration is not None and duration < seconds - 0.25:
+            output_file.unlink(missing_ok=True)
+            raise RuntimeError(f"Replay gerado com {duration:.2f}s, menor que os {seconds}s esperados.")
+
         return output_file
 
     def latest_segments(self, seconds: int) -> list[Path]:
-        count = max(1, int(seconds / self.segment_time_seconds) + 4)
+        count = max(1, math.ceil(seconds / self.segment_time_seconds))
         segments = [
             segment
             for segment in self.buffer_dir.glob("segment_*.ts")
-            if segment.is_file() and segment.stat().st_size > 0 and self.is_recent_segment(segment) and self.is_closed_segment(segment)
+            if segment.is_file() and segment.stat().st_size > 0 and self.is_closed_segment(segment)
         ]
-        return sorted(segments, key=lambda path: path.stat().st_mtime)[-count:]
+        segments = sorted(segments, key=lambda path: path.stat().st_mtime)
+        if len(segments) < count:
+            raise RuntimeError(f"Buffer ainda nao tem {seconds}s fechados. Aguarde mais alguns segundos.")
+        return segments[-count:]
 
     def latest_segment_mtime(self) -> float | None:
         segments = [
@@ -304,6 +328,34 @@ class CaptureServer:
 
     def is_closed_segment(self, segment: Path) -> bool:
         return time.time() - segment.stat().st_mtime >= max(0.5, self.segment_time_seconds * 0.5)
+
+    def replay_duration(self, replay_file: Path) -> float | None:
+        if not self.ffprobe:
+            return None
+
+        result = subprocess.run(
+            [
+                self.ffprobe,
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(replay_file),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=15,
+        )
+        if result.returncode != 0:
+            return None
+
+        try:
+            return float(result.stdout.strip())
+        except ValueError:
+            return None
 
     def upload_replay(self, output_file: Path, request_id: int, seconds: int, label: str | None) -> None:
         with output_file.open("rb") as stream:
