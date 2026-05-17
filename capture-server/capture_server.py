@@ -280,11 +280,11 @@ class CaptureServer:
         return output_file
 
     def latest_segments(self, seconds: int) -> list[Path]:
-        count = max(1, int(seconds / self.segment_time_seconds) + 3)
+        count = max(1, int(seconds / self.segment_time_seconds) + 4)
         segments = [
             segment
             for segment in self.buffer_dir.glob("segment_*.ts")
-            if segment.is_file() and segment.stat().st_size > 0 and self.is_recent_segment(segment)
+            if segment.is_file() and segment.stat().st_size > 0 and self.is_recent_segment(segment) and self.is_closed_segment(segment)
         ]
         return sorted(segments, key=lambda path: path.stat().st_mtime)[-count:]
 
@@ -301,6 +301,9 @@ class CaptureServer:
     def is_recent_segment(self, segment: Path) -> bool:
         max_age = max(self.segment_time_seconds * 4, 15)
         return time.time() - segment.stat().st_mtime <= max_age
+
+    def is_closed_segment(self, segment: Path) -> bool:
+        return time.time() - segment.stat().st_mtime >= max(0.5, self.segment_time_seconds * 0.5)
 
     def upload_replay(self, output_file: Path, request_id: int, seconds: int, label: str | None) -> None:
         with output_file.open("rb") as stream:

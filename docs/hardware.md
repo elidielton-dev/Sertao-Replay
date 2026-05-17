@@ -1,6 +1,6 @@
 # Hardware
 
-## Controlador físico
+## Controlador fisico
 
 Placa usada:
 
@@ -11,26 +11,25 @@ Arduino Leonardo
 Motivo:
 
 - funciona como teclado USB HID;
-- permite enviar F13, F14, F15 etc.;
-- é barato;
-- é fácil de programar;
-- é suficiente para o MVP.
+- funciona como atalho de teclado para gerar replay;
+- e barato;
+- e facil de programar;
+- e suficiente para o MVP.
 
-## Botões sugeridos
+## Botoes sugeridos
 
-- 3 botões arcade para replay;
-- 1 botão para salvar lance;
-- 1 botão para trocar câmera.
+- 4 botoes arcade que podem gerar replay 15s;
+- 1 botao para trocar camera.
 
-## Ligação
+## Ligacao
 
-Cada botão:
+Cada botao:
 
 ```text
-Pino digital do Leonardo ---- Botão ---- GND
+Pino digital do Leonardo ---- Botao ---- GND
 ```
 
-No código usamos:
+No codigo usamos:
 
 ```cpp
 INPUT_PULLUP
@@ -38,15 +37,15 @@ INPUT_PULLUP
 
 Isso significa:
 
-- botão solto = HIGH;
-- botão pressionado = LOW.
+- botao solto = HIGH;
+- botao pressionado = LOW.
 
 ## Mapeamento
 
-| Botão | Pino | Tecla |
+| Botao | Pino | Tecla |
 |---|---:|---|
-| Replay 10s | 2 | F13 |
+| Replay 15s | 2 | F14 |
 | Replay 15s | 3 | F14 |
-| Replay 30s | 4 | F15 |
-| Salvar lance | 5 | F16 |
-| Trocar câmera | 6 | F17 |
+| Replay 15s | 4 | F14 |
+| Replay 15s | 5 | F14 |
+| Trocar camera | 6 | F17 |

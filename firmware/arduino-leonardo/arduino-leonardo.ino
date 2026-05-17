@@ -10,10 +10,10 @@
   - Usar INPUT_PULLUP
 
   Comandos enviados:
-  - Botao Replay 10s   -> F13
   - Botao Replay 15s   -> F14
-  - Botao Replay 30s   -> F15
-  - Botao Salvar lance -> F16
+  - Botao Replay 15s   -> F14
+  - Botao Replay 15s   -> F14
+  - Botao Salvar lance -> F14
   - Botao Trocar camera -> F17
 */
 
@@ -55,7 +55,7 @@ void loop() {
   unsigned long now = millis();
 
   if (pressed(BTN_REPLAY_10) && now - lastPressReplay10 > DEBOUNCE_MS) {
-    sendKey(KEY_F13);
+    sendKey(KEY_F14);
     lastPressReplay10 = now;
   }
 
@@ -65,12 +65,12 @@ void loop() {
   }
 
   if (pressed(BTN_REPLAY_30) && now - lastPressReplay30 > DEBOUNCE_MS) {
-    sendKey(KEY_F15);
+    sendKey(KEY_F14);
     lastPressReplay30 = now;
   }
 
   if (pressed(BTN_SAVE) && now - lastPressSave > DEBOUNCE_MS) {
-    sendKey(KEY_F16);
+    sendKey(KEY_F14);
     lastPressSave = now;
   }
 

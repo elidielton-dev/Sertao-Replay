@@ -20,9 +20,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 const OPERATOR_TOKEN_KEY = "sertao_operator_token";
 const REPLAY_HOTKEY_SECONDS = {
-  F13: 10,
+  F13: 15,
   F14: 15,
-  F15: 30,
+  F15: 15,
   F16: 15,
 };
 
