@@ -660,6 +660,14 @@ function replayDurationLabel(duration) {
   return `00:${String(seconds).padStart(2, "0")}`;
 }
 
+function liveSnapshotUrl(cameraId, tick = 0) {
+  if (!cameraId) {
+    return "";
+  }
+
+  return `${API_BASE}/cameras/${encodeURIComponent(cameraId)}/snapshot.jpg?t=${tick}`;
+}
+
 function storedWebrtcUrl(cameraId) {
   if (!cameraId || typeof window === "undefined") {
     return "";
@@ -1095,6 +1103,8 @@ function StreamingPage() {
   const [webrtcError, setWebrtcError] = useState("");
   const [webrtcUrlInput, setWebrtcUrlInput] = useState("");
   const [webrtcConfigVersion, setWebrtcConfigVersion] = useState(0);
+  const [snapshotTick, setSnapshotTick] = useState(Date.now());
+  const [snapshotFailed, setSnapshotFailed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState(chatSeed);
 
@@ -1121,6 +1131,15 @@ function StreamingPage() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
+      setSnapshotTick(Date.now());
+      setSnapshotFailed(false);
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
       setChatMessages((current) => {
         const next = chatSeed[Math.floor(Math.random() * chatSeed.length)];
         return [...current.slice(-24), next];
@@ -1133,13 +1152,17 @@ function StreamingPage() {
   const selectedCameraIdentity = selectedCamera ? parseCameraIdentity(selectedCamera) : null;
   const posterImage = cameraTemplate(selectedCameraIdentity?.cameraId || 1).image;
   const effectiveWebrtcUrl = selectedCamera ? webrtcUrlForCamera(selectedCamera) : "";
+  const snapshotSrc = selectedCamera ? liveSnapshotUrl(selectedCamera.id, snapshotTick) : "";
   const cameraReplays = selectedCamera
     ? replays.filter((replay) => replay.status === "ready" && replay.camera_id === selectedCamera.id && replay.video_url).slice(0, 6)
     : [];
-  const isLive = webrtcStatus === "connected" || webrtcStatus === "receiving";
+  const usingSnapshotFallback = !snapshotFailed && Boolean(snapshotSrc) && webrtcStatus === "error";
+  const isLive = webrtcStatus === "connected" || webrtcStatus === "receiving" || usingSnapshotFallback;
   const streamStatusLabel =
     webrtcStatus === "connected" || webrtcStatus === "receiving"
       ? "Ao vivo"
+      : usingSnapshotFallback
+        ? "Ao vivo fallback"
       : webrtcStatus === "connecting"
         ? "Conectando"
         : webrtcStatus === "missing-url"
@@ -1313,12 +1336,21 @@ function StreamingPage() {
             <video
               ref={videoRef}
               autoPlay
-              className={`h-full w-full object-contain ${isLive ? "opacity-100" : "opacity-45"}`}
+              className={`h-full w-full object-contain ${webrtcStatus === "connected" || webrtcStatus === "receiving" ? "opacity-100" : "opacity-0"}`}
               controls
               muted
               playsInline
               poster={posterImage}
             />
+
+            {usingSnapshotFallback ? (
+              <img
+                alt={`Camera ao vivo de ${selectedCamera?.name || "camera"}`}
+                className="absolute inset-0 h-full w-full object-contain"
+                onError={() => setSnapshotFailed(true)}
+                src={snapshotSrc}
+              />
+            ) : null}
 
             {!isLive ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0b0f0e]/80 p-8 text-center backdrop-blur-sm">
@@ -1334,7 +1366,13 @@ function StreamingPage() {
 
             <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/55 px-3 py-1 backdrop-blur">
               <span className={`h-2 w-2 rounded-full ${isLive ? "animate-pulse bg-[#a1fb00]" : "bg-[#ffb4ab]"}`} />
-              <span className="text-xs font-bold text-white">{isLive ? "Transmitindo ao vivo por WebRTC" : streamStatusLabel}</span>
+              <span className="text-xs font-bold text-white">
+                {webrtcStatus === "connected" || webrtcStatus === "receiving"
+                  ? "Transmitindo ao vivo por WebRTC"
+                  : usingSnapshotFallback
+                    ? "Ao vivo por snapshots enquanto WebRTC conecta"
+                    : streamStatusLabel}
+              </span>
             </div>
           </div>
 
@@ -1359,6 +1397,7 @@ function StreamingPage() {
                     onClick={() => {
                       setSelectedCameraId(camera.id);
                       setWebrtcError("");
+                      setSnapshotFailed(false);
                     }}
                     type="button"
                   >
