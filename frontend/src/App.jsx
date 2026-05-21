@@ -1435,10 +1435,10 @@ function StreamingPage() {
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0b0f0e]/80 p-8 text-center backdrop-blur-sm">
                 <Video size={48} className="mb-4 text-[#a1fb00]" />
                 <h1 className="mb-2 text-2xl font-black text-white">
-                  {webrtcStatus === "connecting" ? "Conectando live WebRTC" : "Live WebRTC indisponivel"}
+                  {webrtcStatus === "connecting" ? "Conectando live" : "Live indisponivel"}
                 </h1>
                 <p className="max-w-md text-sm text-[#c0caad]">
-                  {webrtcError || "Informe uma URL WHEP/WebRTC para transmitir a camera em tempo real."}
+                  {webrtcError || "A transmissao da camera conecta automaticamente em alguns instantes."}
                 </p>
               </div>
             ) : null}
