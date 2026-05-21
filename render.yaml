@@ -17,7 +17,7 @@ services:
       - key: OPERATOR_TOKEN
         generateValue: true
       - key: WEBRTC_WHEP_URL_MAP
-        value: campo-01=http://54.207.185.74:8889/camera1/whep
+        value: campo-01=http://187.19.251.46:8889/campo-01-live/whep
 
 databases:
   - name: sports-replay-db

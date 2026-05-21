@@ -37,6 +37,8 @@ backend/storage/buffer/
 backend/storage/replays/*
 backend/storage/logs/*
 capture-server/storage/
+tools/
+!tools/.gitkeep
 !backend/storage/replays/.gitkeep
 !backend/storage/logs/.gitkeep
 *.mp4

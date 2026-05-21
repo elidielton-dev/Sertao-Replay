@@ -27,7 +27,7 @@ logger = get_logger(__name__)
 camera_service = CameraService()
 replay_service = ReplayService()
 settings = get_settings()
-DEFAULT_WEBRTC_WHEP_URL_MAP = "campo-01=http://54.207.185.74:8889/camera1/whep"
+DEFAULT_WEBRTC_WHEP_URL_MAP = "campo-01=http://187.19.251.46:8889/campo-01-live/whep"
 
 
 def require_operator(
