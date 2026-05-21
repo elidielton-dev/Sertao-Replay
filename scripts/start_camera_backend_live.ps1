@@ -61,6 +61,20 @@ function Write-Warn($message) {
     Write-Host "[AVISO] $message"
 }
 
+function Redact-SensitiveText([string]$text) {
+    return ($text -replace 'rtsp://[^/@\s]+@', 'rtsp://***@')
+}
+
+function Write-SafeLogTail([string]$path, [int]$lines = 20) {
+    if (-not (Test-Path $path)) {
+        return
+    }
+
+    Get-Content $path -Tail $lines | ForEach-Object {
+        Write-Host (Redact-SensitiveText $_)
+    }
+}
+
 function Read-DotEnv($path) {
     $values = @{}
     if (-not (Test-Path $path)) {
@@ -323,10 +337,6 @@ $CameraSourceTransport = if ($CameraSourceTransport) { $CameraSourceTransport } 
 $PublicWebrtcHost = if ($PublicWebrtcHost) { $PublicWebrtcHost } else { Get-EnvValue $envValues "PUBLIC_WEBRTC_HOST" }
 $LocalIp = if ($LocalIp) { $LocalIp } else { Get-EnvValue $envValues "LOCAL_IP" }
 
-if ([string]::IsNullOrWhiteSpace($CameraSourceRtspUrl)) {
-    $CameraSourceRtspUrl = Get-EnvValue $envValues "LOCAL_RTSP_URL"
-}
-
 if ([string]::IsNullOrWhiteSpace($BackendApiUrl)) {
     throw "BACKEND_API_URL nao configurado em capture-server\.env."
 }
@@ -335,6 +345,9 @@ if ([string]::IsNullOrWhiteSpace($OperatorToken)) {
 }
 if ([string]::IsNullOrWhiteSpace($CameraSourceRtspUrl) -or -not $CameraSourceRtspUrl.StartsWith("rtsp://")) {
     throw "CAMERA_SOURCE_RTSP_URL precisa ser uma URL RTSP valida da camera real."
+}
+if ($CameraSourceRtspUrl -match "127\.0\.0\.1:$rtspPort/$liveRtspPath") {
+    throw "CAMERA_SOURCE_RTSP_URL deve apontar para a camera real, nao para a live local."
 }
 if ($CameraSourceTransport -notin @("udp", "tcp")) {
     throw "CAMERA_SOURCE_RTSP_TRANSPORT precisa ser 'udp' ou 'tcp'."
@@ -400,10 +413,8 @@ webrtcICEServers2:
   - url: stun:stun.l.google.com:19302
 
 paths:
-  ${cameraRtspPath}:
-    source: $CameraSourceRtspUrl
-    rtspTransport: $CameraSourceTransport
-    sourceOnDemand: false
+  ${liveRtspPath}:
+    source: publisher
   all_others:
 "@ | Set-Content -Encoding ascii $mediaMtxConfig
 
@@ -426,7 +437,7 @@ $envValues["CAMERA_ID"] = $CameraId
 $envValues["CAMERA_NAME"] = $CameraName
 $envValues["CAMERA_SOURCE_RTSP_URL"] = $CameraSourceRtspUrl
 $envValues["CAMERA_SOURCE_RTSP_TRANSPORT"] = $CameraSourceTransport
-$envValues["LOCAL_RTSP_URL"] = "rtsp://127.0.0.1:$rtspPort/$cameraRtspPath"
+$envValues["LOCAL_RTSP_URL"] = "rtsp://127.0.0.1:$rtspPort/$liveRtspPath"
 $envValues["RTSP_TRANSPORT"] = "tcp"
 $envValues["PUBLIC_WEBRTC_HOST"] = $PublicWebrtcHost
 $envValues["LOCAL_IP"] = $LocalIp
@@ -438,12 +449,6 @@ $mediaMtxProcess = Start-Process -FilePath $mediaMtxExe -ArgumentList "`"$mediaM
 $mediaMtxProcess.Id | Set-Content -Encoding ascii $mediaMtxPid
 Wait-Port $rtspPort "MediaMTX RTSP" | Out-Null
 Wait-Port $webrtcHttpPort "MediaMTX WebRTC/WHEP" | Out-Null
-if (-not (Wait-RtspPath "rtsp://127.0.0.1:$rtspPort/$cameraRtspPath" "Fonte RTSP local da camera")) {
-    if (Test-Path $mediaMtxOutLog) {
-        Get-Content $mediaMtxOutLog -Tail 25
-    }
-    throw "A camera real nao ficou online no MediaMTX. Verifique CAMERA_SOURCE_RTSP_URL e CAMERA_SOURCE_RTSP_TRANSPORT."
-}
 
 Write-Host "Publicando live H264 para WebRTC..."
 $transcodeArgs = @(
@@ -474,16 +479,14 @@ Start-Sleep -Seconds 8
 
 if ($transcodeProcess.HasExited) {
     Write-Warn "FFmpeg da live encerrou. Ultimas linhas:"
-    if (Test-Path $transcodeErrLog) {
-        Get-Content $transcodeErrLog -Tail 20
-    }
+    Write-SafeLogTail $transcodeErrLog 20
     throw "Nao foi possivel publicar a live H264. Verifique a URL RTSP da camera."
 }
 Write-Ok "Live H264 publicada em rtsp://127.0.0.1:$rtspPort/$liveRtspPath"
 
 Write-Step "Registrando camera no backend"
 try {
-    Register-BackendCamera $BackendApiUrl $OperatorToken $CameraId $CameraName "rtsp://127.0.0.1:$rtspPort/$cameraRtspPath" $whepPublicUrl
+    Register-BackendCamera $BackendApiUrl $OperatorToken $CameraId $CameraName "rtsp://127.0.0.1:$rtspPort/$liveRtspPath" $whepPublicUrl
     Write-Ok "Camera '$CameraId' cadastrada/atualizada no backend."
 } catch {
     Write-Warn "Backend nao respondeu ou recusou o cadastro agora: $($_.Exception.Message)"
@@ -514,15 +517,13 @@ Start-Sleep -Seconds 8
 
 if ($captureProcess.HasExited) {
     Write-Warn "capture-server encerrou. Ultimas linhas:"
-    if (Test-Path $captureErrLog) {
-        Get-Content $captureErrLog -Tail 25
-    }
+    Write-SafeLogTail $captureErrLog 25
     throw "Nao foi possivel manter o capture-server rodando."
 }
 Write-Ok "Capture-server rodando para camera '$CameraId'."
 
 try {
-    Register-BackendCamera $BackendApiUrl $OperatorToken $CameraId $CameraName "rtsp://127.0.0.1:$rtspPort/$cameraRtspPath" $whepPublicUrl
+    Register-BackendCamera $BackendApiUrl $OperatorToken $CameraId $CameraName "rtsp://127.0.0.1:$rtspPort/$liveRtspPath" $whepPublicUrl
     Write-Ok "Cadastro final da camera confirmado no backend."
 } catch {
     Write-Warn "Nao consegui confirmar o cadastro final no backend: $($_.Exception.Message)"
