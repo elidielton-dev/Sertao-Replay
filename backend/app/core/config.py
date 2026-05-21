@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     live_snapshot_root: str = "./storage/live"
     log_root: str = "./storage/logs"
     default_replay_seconds: int = 15
+    webrtc_whep_base_url: str | None = None
+    webrtc_whep_url_map: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

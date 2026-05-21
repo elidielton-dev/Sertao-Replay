@@ -1,8 +1,12 @@
 import re
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -66,6 +70,51 @@ def _log(db: Session, source: str, level: str, message: str, camera_id: str | No
 
 def _safe_camera_file_id(camera_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]+", "_", camera_id).strip("_") or "camera"
+
+
+def _webrtc_url_map() -> dict[str, str]:
+    url_map: dict[str, str] = {}
+    if not settings.webrtc_whep_url_map:
+        return url_map
+
+    for item in re.split(r"[,\n;]+", settings.webrtc_whep_url_map):
+        if "=" not in item:
+            continue
+
+        camera_id, url = item.split("=", 1)
+        camera_id = camera_id.strip()
+        url = url.strip()
+        if camera_id and url:
+            url_map[camera_id] = url
+
+    return url_map
+
+
+def _webrtc_offer_url(camera_id: str) -> str | None:
+    url_map = _webrtc_url_map()
+    if camera_id in url_map:
+        return url_map[camera_id]
+
+    if settings.webrtc_whep_base_url:
+        safe_camera_id = urllib.parse.quote(camera_id, safe="")
+        return f"{settings.webrtc_whep_base_url.rstrip('/')}/{safe_camera_id}/whep"
+
+    return None
+
+
+def _post_webrtc_offer(offer_url: str, offer_sdp: bytes) -> bytes:
+    request = urllib.request.Request(
+        offer_url,
+        data=offer_sdp,
+        headers={
+            "Accept": "application/sdp",
+            "Content-Type": "application/sdp",
+        },
+        method="POST",
+    )
+
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return response.read()
 
 
 @router.get("/health")
@@ -157,6 +206,41 @@ def get_camera_snapshot(camera_id: str):
     return FileResponse(
         path=snapshot_path,
         media_type="image/jpeg",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
+@router.post("/cameras/{camera_id}/webrtc/offer")
+async def create_webrtc_offer(camera_id: str, request: Request, db: Session = Depends(get_db)):
+    try:
+        camera_service.get_camera(db, camera_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    offer_url = _webrtc_offer_url(camera_id)
+    if not offer_url:
+        raise HTTPException(
+            status_code=404,
+            detail="Gateway WebRTC nao configurado para esta camera.",
+        )
+
+    offer_sdp = await request.body()
+    if not offer_sdp.strip():
+        raise HTTPException(status_code=400, detail="Envie o SDP offer da conexao WebRTC.")
+
+    try:
+        answer = await run_in_threadpool(_post_webrtc_offer, offer_url, offer_sdp)
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")[:500] or f"Gateway WebRTC respondeu {exc.code}."
+        raise HTTPException(status_code=502, detail=detail) from exc
+    except urllib.error.URLError as exc:
+        raise HTTPException(status_code=502, detail=f"Gateway WebRTC inacessivel: {exc.reason}") from exc
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Gateway WebRTC demorou para responder.") from exc
+
+    return Response(
+        content=answer,
+        media_type="application/sdp",
         headers={"Cache-Control": "no-store, max-age=0"},
     )
 

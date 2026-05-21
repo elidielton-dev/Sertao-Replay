@@ -13,13 +13,19 @@ import {
   Settings,
   Video,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const DEFAULT_API_BASE =
   typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
     ? "https://sertao-replay.onrender.com/api"
     : "/api";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/$/, "");
+const DEFAULT_WEBRTC_BASE =
+  typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "http://localhost:8889"
+    : "";
+const WEBRTC_BASE = (import.meta.env.VITE_WEBRTC_BASE_URL || DEFAULT_WEBRTC_BASE).replace(/\/$/, "");
+const WEBRTC_URL_STORAGE_PREFIX = "sertao_webrtc_url_";
 const OPERATOR_TOKEN_KEY = "sertao_operator_token";
 const REPLAY_HOTKEY_SECONDS = {
   F13: 15,
@@ -230,7 +236,7 @@ const sponsors = [
 ];
 
 const navItems = [
-  { label: "STREAMING", href: "#streaming" },
+  { label: "STREAMING", href: "/streaming" },
   { label: "HIGHLIGHTS", href: "#highlights" },
   { label: "TOURNAMENTS", href: "#tournaments" },
 ];
@@ -654,12 +660,97 @@ function replayDurationLabel(duration) {
   return `00:${String(seconds).padStart(2, "0")}`;
 }
 
-function liveSnapshotUrl(cameraId, tick = 0) {
-  if (!cameraId) {
+function storedWebrtcUrl(cameraId) {
+  if (!cameraId || typeof window === "undefined") {
     return "";
   }
 
-  return `${API_BASE}/cameras/${encodeURIComponent(cameraId)}/snapshot.jpg?t=${tick}`;
+  try {
+    return (
+      window.localStorage.getItem(`${WEBRTC_URL_STORAGE_PREFIX}${cameraId}`) ||
+      window.localStorage.getItem("sertao_webrtc_url") ||
+      ""
+    );
+  } catch {
+    return "";
+  }
+}
+
+function saveStoredWebrtcUrl(cameraId, value) {
+  if (!cameraId || typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const storageKey = `${WEBRTC_URL_STORAGE_PREFIX}${cameraId}`;
+    if (value.trim()) {
+      window.localStorage.setItem(storageKey, value.trim());
+    } else {
+      window.localStorage.removeItem(storageKey);
+    }
+  } catch {
+    // localStorage can be unavailable in private browser contexts.
+  }
+}
+
+function webrtcUrlForCamera(camera) {
+  if (!camera?.id) {
+    return "";
+  }
+
+  const storedUrl = storedWebrtcUrl(camera.id);
+  if (storedUrl) {
+    return storedUrl;
+  }
+
+  if (camera.webrtc_url || camera.webrtcUrl) {
+    return camera.webrtc_url || camera.webrtcUrl;
+  }
+
+  if (WEBRTC_BASE) {
+    return `${WEBRTC_BASE}/${encodeURIComponent(camera.id)}/whep`;
+  }
+
+  return `${API_BASE}/cameras/${encodeURIComponent(camera.id)}/webrtc/offer`;
+}
+
+function waitForIceGatheringComplete(peerConnection) {
+  if (peerConnection.iceGatheringState === "complete") {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let timeout;
+    let settled = false;
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      window.clearTimeout(timeout);
+      peerConnection.removeEventListener("icegatheringstatechange", handleChange);
+      resolve();
+    };
+
+    const handleChange = () => {
+      if (peerConnection.iceGatheringState === "complete") {
+        finish();
+      }
+    };
+
+    peerConnection.addEventListener("icegatheringstatechange", handleChange);
+    timeout = window.setTimeout(finish, 2500);
+  });
+}
+
+function clearVideoStream(video) {
+  if (!video?.srcObject) {
+    return;
+  }
+
+  video.srcObject.getTracks?.().forEach((track) => track.stop());
+  video.srcObject = null;
 }
 
 function IconButton({ children, className = "", ...props }) {
@@ -993,13 +1084,17 @@ const chatSeed = [
 ];
 
 function StreamingPage() {
+  const videoRef = useRef(null);
+  const peerConnectionRef = useRef(null);
   const [cameras, setCameras] = useState([]);
   const [replays, setReplays] = useState([]);
   const [status, setStatus] = useState("loading");
-  const [message, setMessage] = useState("Conectando ao streaming...");
+  const [message, setMessage] = useState("Buscando cameras ao vivo...");
   const [selectedCameraId, setSelectedCameraId] = useState("");
-  const [snapshotTick, setSnapshotTick] = useState(Date.now());
-  const [snapshotFailed, setSnapshotFailed] = useState(false);
+  const [webrtcStatus, setWebrtcStatus] = useState("idle");
+  const [webrtcError, setWebrtcError] = useState("");
+  const [webrtcUrlInput, setWebrtcUrlInput] = useState("");
+  const [webrtcConfigVersion, setWebrtcConfigVersion] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState(chatSeed);
 
@@ -1012,7 +1107,7 @@ function StreamingPage() {
         setReplays(Array.isArray(replayData) ? replayData : []);
         setSelectedCameraId((current) => current || enabledCameras.find((camera) => camera.status === "recording")?.id || enabledCameras[0]?.id || "");
         setStatus("ready");
-        setMessage("Streaming ao vivo conectado.");
+        setMessage("Live pronta para conectar via WebRTC.");
       } catch (error) {
         setStatus("error");
         setMessage(error.message);
@@ -1026,14 +1121,6 @@ function StreamingPage() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setSnapshotTick(Date.now());
-      setSnapshotFailed(false);
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
       setChatMessages((current) => {
         const next = chatSeed[Math.floor(Math.random() * chatSeed.length)];
         return [...current.slice(-24), next];
@@ -1043,12 +1130,153 @@ function StreamingPage() {
   }, []);
 
   const selectedCamera = cameras.find((camera) => camera.id === selectedCameraId) || cameras[0];
+  const selectedCameraIdentity = selectedCamera ? parseCameraIdentity(selectedCamera) : null;
+  const posterImage = cameraTemplate(selectedCameraIdentity?.cameraId || 1).image;
+  const effectiveWebrtcUrl = selectedCamera ? webrtcUrlForCamera(selectedCamera) : "";
   const cameraReplays = selectedCamera
     ? replays.filter((replay) => replay.status === "ready" && replay.camera_id === selectedCamera.id && replay.video_url).slice(0, 6)
     : [];
-  const latestReplay = cameraReplays[0];
-  const isLive = selectedCamera?.status === "recording";
-  const snapshotSrc = selectedCamera ? liveSnapshotUrl(selectedCamera.id, snapshotTick) : "";
+  const isLive = webrtcStatus === "connected" || webrtcStatus === "receiving";
+  const streamStatusLabel =
+    webrtcStatus === "connected" || webrtcStatus === "receiving"
+      ? "Ao vivo"
+      : webrtcStatus === "connecting"
+        ? "Conectando"
+        : webrtcStatus === "missing-url"
+          ? "Configurar WebRTC"
+          : webrtcStatus === "error"
+            ? "Sem sinal"
+            : selectedCamera?.status || "Offline";
+
+  useEffect(() => {
+    setWebrtcUrlInput(effectiveWebrtcUrl);
+  }, [effectiveWebrtcUrl, selectedCamera?.id]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+
+    if (!selectedCamera?.id) {
+      setWebrtcStatus("idle");
+      setWebrtcError("");
+      clearVideoStream(video);
+      return undefined;
+    }
+
+    if (!effectiveWebrtcUrl) {
+      setWebrtcStatus("missing-url");
+      setWebrtcError("");
+      clearVideoStream(video);
+      return undefined;
+    }
+
+    if (typeof window === "undefined" || !window.RTCPeerConnection) {
+      setWebrtcStatus("error");
+      setWebrtcError("Este navegador nao tem suporte a WebRTC.");
+      clearVideoStream(video);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const peerConnection = new window.RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+
+    peerConnectionRef.current = peerConnection;
+    setWebrtcStatus("connecting");
+    setWebrtcError("");
+
+    peerConnection.addTransceiver("video", { direction: "recvonly" });
+    peerConnection.addTransceiver("audio", { direction: "recvonly" });
+
+    peerConnection.ontrack = (event) => {
+      if (cancelled || !video) {
+        return;
+      }
+
+      const stream = event.streams?.[0];
+      if (stream && video.srcObject !== stream) {
+        video.srcObject = stream;
+        video.play().catch(() => {});
+      }
+
+      setWebrtcStatus("receiving");
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+      if (cancelled) {
+        return;
+      }
+
+      if (peerConnection.connectionState === "connected") {
+        setWebrtcStatus("connected");
+      }
+
+      if (peerConnection.connectionState === "failed" || peerConnection.connectionState === "disconnected") {
+        setWebrtcStatus("error");
+        setWebrtcError("A conexao WebRTC caiu. Verifique o gateway da camera.");
+      }
+    };
+
+    async function connectWebrtc() {
+      try {
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        await waitForIceGatheringComplete(peerConnection);
+
+        if (cancelled) {
+          return;
+        }
+
+        const response = await fetch(effectiveWebrtcUrl, {
+          method: "POST",
+          headers: {
+            Accept: "application/sdp",
+            "Content-Type": "application/sdp",
+          },
+          body: peerConnection.localDescription?.sdp || offer.sdp,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Gateway WebRTC respondeu ${response.status}.`);
+        }
+
+        const answer = await response.text();
+        if (!answer.trim()) {
+          throw new Error("Gateway WebRTC nao retornou SDP.");
+        }
+
+        await peerConnection.setRemoteDescription({ type: "answer", sdp: answer });
+      } catch (error) {
+        if (!cancelled) {
+          setWebrtcStatus("error");
+          setWebrtcError(error.message || "Nao foi possivel abrir a live por WebRTC.");
+          clearVideoStream(video);
+        }
+      }
+    }
+
+    connectWebrtc();
+
+    return () => {
+      cancelled = true;
+      if (peerConnectionRef.current === peerConnection) {
+        peerConnectionRef.current = null;
+      }
+      peerConnection.close();
+      clearVideoStream(video);
+    };
+  }, [effectiveWebrtcUrl, selectedCamera?.id, webrtcConfigVersion]);
+
+  function handleSaveWebrtcUrl(event) {
+    event.preventDefault();
+    if (!selectedCamera?.id) {
+      return;
+    }
+
+    saveStoredWebrtcUrl(selectedCamera.id, webrtcUrlInput);
+    setMessage(webrtcUrlInput.trim() ? "URL WebRTC salva para esta camera." : "URL WebRTC removida desta camera.");
+    setWebrtcConfigVersion((current) => current + 1);
+  }
 
   return (
     <main className="min-h-screen bg-[#101413] px-4 pb-10 pt-20 text-[#e0e3e0] md:px-12">
@@ -1071,7 +1299,7 @@ function StreamingPage() {
 
         <div className="flex items-center gap-3">
           <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${isLive ? "bg-[#a1fb00] text-[#102000]" : "bg-[#272b29] text-[#c0caad]"}`}>
-            {isLive ? "Ao vivo" : selectedCamera?.status || "Offline"}
+            {streamStatusLabel}
           </span>
           <a className="rounded-full border border-[#8ddc00]/40 px-4 py-2 text-xs font-bold text-[#a1fb00] no-underline" href={selectedCamera ? cameraPathFromBackendId(selectedCamera.id) : "/"}>
             Camera
@@ -1082,24 +1310,31 @@ function StreamingPage() {
       <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-6 lg:grid-cols-12">
         <section className="space-y-6 lg:col-span-8 xl:col-span-9">
           <div className="relative aspect-video overflow-hidden rounded-xl border border-[#8ddc00]/20 bg-black shadow-[0_0_15px_rgba(141,220,0,0.3)]">
-            {snapshotSrc && !snapshotFailed ? (
-              <img
-                alt={`Streaming ao vivo de ${selectedCamera?.name || "camera"}`}
-                className="h-full w-full object-contain"
-                onError={() => setSnapshotFailed(true)}
-                src={snapshotSrc}
-              />
-            ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center bg-[#0b0f0e] p-8 text-center">
+            <video
+              ref={videoRef}
+              autoPlay
+              className={`h-full w-full object-contain ${isLive ? "opacity-100" : "opacity-45"}`}
+              controls
+              muted
+              playsInline
+              poster={posterImage}
+            />
+
+            {!isLive ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0b0f0e]/80 p-8 text-center backdrop-blur-sm">
                 <Video size={48} className="mb-4 text-[#a1fb00]" />
-                <h1 className="mb-2 text-2xl font-black text-white">Aguardando imagem ao vivo</h1>
-                <p className="max-w-md text-sm text-[#c0caad]">O capture-server precisa estar rodando e enviando snapshots da camera para o backend.</p>
+                <h1 className="mb-2 text-2xl font-black text-white">
+                  {webrtcStatus === "connecting" ? "Conectando live WebRTC" : "Live WebRTC indisponivel"}
+                </h1>
+                <p className="max-w-md text-sm text-[#c0caad]">
+                  {webrtcError || "Informe uma URL WHEP/WebRTC para transmitir a camera em tempo real."}
+                </p>
               </div>
-            )}
+            ) : null}
 
             <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/55 px-3 py-1 backdrop-blur">
               <span className={`h-2 w-2 rounded-full ${isLive ? "animate-pulse bg-[#a1fb00]" : "bg-[#ffb4ab]"}`} />
-              <span className="text-xs font-bold text-white">{isLive ? "Transmitindo em tempo real" : "Camera sem sinal ao vivo"}</span>
+              <span className="text-xs font-bold text-white">{isLive ? "Transmitindo ao vivo por WebRTC" : streamStatusLabel}</span>
             </div>
           </div>
 
@@ -1123,7 +1358,7 @@ function StreamingPage() {
                     key={camera.id}
                     onClick={() => {
                       setSelectedCameraId(camera.id);
-                      setSnapshotFailed(false);
+                      setWebrtcError("");
                     }}
                     type="button"
                   >
@@ -1136,19 +1371,33 @@ function StreamingPage() {
 
           <section className="rounded-xl border border-[#414a34]/60 bg-[#181c1b] p-4">
             <div className="mb-2 flex flex-wrap gap-4 text-sm font-bold text-white">
-              <span>{isLive ? "Online agora" : "Status: " + (selectedCamera?.status || "unknown")}</span>
-              <span>{cameraReplays.length} replays recentes</span>
+              <span>{isLive ? "Online agora" : "Status: " + streamStatusLabel}</span>
+              <span>{cameraReplays.length} highlights recentes</span>
             </div>
-            <p className="m-0 leading-relaxed text-[#c0caad]">A camera fica sendo atualizada pelo capture-server local. Para transmissao continua no navegador, esta tela consome frames ao vivo enviados para o backend.</p>
+            <form className="grid gap-3 md:grid-cols-[1fr_auto]" onSubmit={handleSaveWebrtcUrl}>
+              <input
+                className="min-w-0 rounded-lg border border-[#414a34] bg-[#0b0f0e] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#8a947a] focus:border-[#a1fb00] focus:ring-0"
+                onChange={(event) => setWebrtcUrlInput(event.target.value)}
+                placeholder="https://seu-gateway-webrtc/campo-01/whep"
+                type="text"
+                value={webrtcUrlInput}
+              />
+              <button className="rounded-lg bg-[#a1fb00] px-5 py-3 text-sm font-black uppercase tracking-[0.08em] text-[#102000] transition hover:opacity-90 active:scale-95" type="submit">
+                Salvar live
+              </button>
+            </form>
+            <p className="mt-3 mb-0 text-xs leading-relaxed text-[#c0caad]">
+              Live fica no WebRTC. Replays gravados aparecem abaixo como highlights.
+            </p>
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-2xl font-black text-white">Recomendados</h2>
+            <h2 className="text-2xl font-black text-white">Highlights recentes</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {cameraReplays.map((replay) => (
                 <a className="group text-white no-underline" href={mediaUrl(replay.video_url)} key={replay.id} target="_blank" rel="noreferrer">
                   <div className="relative mb-2 aspect-video overflow-hidden rounded-xl bg-[#0b0f0e]">
-                    <img alt={replayTitle(replay)} className="h-full w-full object-cover opacity-70 transition duration-500 group-hover:scale-105" src={snapshotSrc || cameraTemplate(1).image} />
+                    <img alt={replayTitle(replay)} className="h-full w-full object-cover opacity-70 transition duration-500 group-hover:scale-105" src={posterImage} />
                     <span className="absolute bottom-2 right-2 rounded bg-black/80 px-2 py-1 text-xs text-white">{replayDurationLabel(replay.duration)}</span>
                   </div>
                   <h3 className="mb-1 line-clamp-2 font-bold transition group-hover:text-[#a1fb00]">{replayTitle(replay)}</h3>
@@ -1157,7 +1406,7 @@ function StreamingPage() {
               ))}
 
               {!cameraReplays.length ? (
-                <div className="rounded-xl border border-[#414a34] bg-[#181c1b] p-5 text-sm text-[#c0caad]">Nenhum replay recomendado desta camera ainda.</div>
+                <div className="rounded-xl border border-[#414a34] bg-[#181c1b] p-5 text-sm text-[#c0caad]">Nenhum highlight desta camera ainda.</div>
               ) : null}
             </div>
           </section>
