@@ -660,14 +660,6 @@ function replayDurationLabel(duration) {
   return `00:${String(seconds).padStart(2, "0")}`;
 }
 
-function liveSnapshotUrl(cameraId, tick = 0) {
-  if (!cameraId) {
-    return "";
-  }
-
-  return `${API_BASE}/cameras/${encodeURIComponent(cameraId)}/snapshot.jpg?t=${tick}`;
-}
-
 function storedWebrtcUrl(cameraId) {
   if (!cameraId || typeof window === "undefined") {
     return "";
@@ -1094,6 +1086,7 @@ const chatSeed = [
 function StreamingPage() {
   const videoRef = useRef(null);
   const peerConnectionRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
   const [cameras, setCameras] = useState([]);
   const [replays, setReplays] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -1103,8 +1096,6 @@ function StreamingPage() {
   const [webrtcError, setWebrtcError] = useState("");
   const [webrtcUrlInput, setWebrtcUrlInput] = useState("");
   const [webrtcConfigVersion, setWebrtcConfigVersion] = useState(0);
-  const [snapshotTick, setSnapshotTick] = useState(Date.now());
-  const [snapshotFailed, setSnapshotFailed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState(chatSeed);
 
@@ -1131,15 +1122,6 @@ function StreamingPage() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setSnapshotTick(Date.now());
-      setSnapshotFailed(false);
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
       setChatMessages((current) => {
         const next = chatSeed[Math.floor(Math.random() * chatSeed.length)];
         return [...current.slice(-24), next];
@@ -1152,17 +1134,13 @@ function StreamingPage() {
   const selectedCameraIdentity = selectedCamera ? parseCameraIdentity(selectedCamera) : null;
   const posterImage = cameraTemplate(selectedCameraIdentity?.cameraId || 1).image;
   const effectiveWebrtcUrl = selectedCamera ? webrtcUrlForCamera(selectedCamera) : "";
-  const snapshotSrc = selectedCamera ? liveSnapshotUrl(selectedCamera.id, snapshotTick) : "";
   const cameraReplays = selectedCamera
     ? replays.filter((replay) => replay.status === "ready" && replay.camera_id === selectedCamera.id && replay.video_url).slice(0, 6)
     : [];
-  const usingSnapshotFallback = !snapshotFailed && Boolean(snapshotSrc) && webrtcStatus === "error";
-  const isLive = webrtcStatus === "connected" || webrtcStatus === "receiving" || usingSnapshotFallback;
+  const isLive = webrtcStatus === "connected" || webrtcStatus === "receiving";
   const streamStatusLabel =
     webrtcStatus === "connected" || webrtcStatus === "receiving"
       ? "Ao vivo"
-      : usingSnapshotFallback
-        ? "Ao vivo fallback"
       : webrtcStatus === "connecting"
         ? "Conectando"
         : webrtcStatus === "missing-url"
@@ -1171,12 +1149,27 @@ function StreamingPage() {
             ? "Sem sinal"
             : selectedCamera?.status || "Offline";
 
+  const scheduleWebrtcReconnect = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      window.clearTimeout(reconnectTimerRef.current);
+    }
+
+    reconnectTimerRef.current = window.setTimeout(() => {
+      reconnectTimerRef.current = null;
+      setWebrtcConfigVersion((current) => current + 1);
+    }, 3000);
+  }, []);
+
   useEffect(() => {
     setWebrtcUrlInput(effectiveWebrtcUrl);
   }, [effectiveWebrtcUrl, selectedCamera?.id]);
 
   useEffect(() => {
     const video = videoRef.current;
+    if (reconnectTimerRef.current) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
 
     if (!selectedCamera?.id) {
       setWebrtcStatus("idle");
@@ -1237,6 +1230,7 @@ function StreamingPage() {
       if (peerConnection.connectionState === "failed" || peerConnection.connectionState === "disconnected") {
         setWebrtcStatus("error");
         setWebrtcError("A conexao WebRTC caiu. Verifique o gateway da camera.");
+        scheduleWebrtcReconnect();
       }
     };
 
@@ -1274,6 +1268,7 @@ function StreamingPage() {
           setWebrtcStatus("error");
           setWebrtcError(error.message || "Nao foi possivel abrir a live por WebRTC.");
           clearVideoStream(video);
+          scheduleWebrtcReconnect();
         }
       }
     }
@@ -1288,7 +1283,7 @@ function StreamingPage() {
       peerConnection.close();
       clearVideoStream(video);
     };
-  }, [effectiveWebrtcUrl, selectedCamera?.id, webrtcConfigVersion]);
+  }, [effectiveWebrtcUrl, scheduleWebrtcReconnect, selectedCamera?.id, webrtcConfigVersion]);
 
   function handleSaveWebrtcUrl(event) {
     event.preventDefault();
@@ -1336,21 +1331,12 @@ function StreamingPage() {
             <video
               ref={videoRef}
               autoPlay
-              className={`h-full w-full object-contain ${webrtcStatus === "connected" || webrtcStatus === "receiving" ? "opacity-100" : "opacity-0"}`}
+              className="h-full w-full object-contain"
               controls
               muted
               playsInline
               poster={posterImage}
             />
-
-            {usingSnapshotFallback ? (
-              <img
-                alt={`Camera ao vivo de ${selectedCamera?.name || "camera"}`}
-                className="absolute inset-0 h-full w-full object-contain"
-                onError={() => setSnapshotFailed(true)}
-                src={snapshotSrc}
-              />
-            ) : null}
 
             {!isLive ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0b0f0e]/80 p-8 text-center backdrop-blur-sm">
@@ -1369,9 +1355,7 @@ function StreamingPage() {
               <span className="text-xs font-bold text-white">
                 {webrtcStatus === "connected" || webrtcStatus === "receiving"
                   ? "Transmitindo ao vivo por WebRTC"
-                  : usingSnapshotFallback
-                    ? "Ao vivo por snapshots enquanto WebRTC conecta"
-                    : streamStatusLabel}
+                  : streamStatusLabel}
               </span>
             </div>
           </div>
@@ -1397,7 +1381,6 @@ function StreamingPage() {
                     onClick={() => {
                       setSelectedCameraId(camera.id);
                       setWebrtcError("");
-                      setSnapshotFailed(false);
                     }}
                     type="button"
                   >
