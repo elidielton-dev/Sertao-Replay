@@ -31,6 +31,7 @@ app.include_router(router, prefix="/api")
 @app.on_event("startup")
 def on_startup() -> None:
     settings.replay_path.mkdir(parents=True, exist_ok=True)
+    settings.live_snapshot_path.mkdir(parents=True, exist_ok=True)
     settings.log_path.mkdir(parents=True, exist_ok=True)
     init_db()
     logger.info("Aplicacao iniciada.")

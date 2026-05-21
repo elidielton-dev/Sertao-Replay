@@ -52,9 +52,11 @@ class CaptureServer:
         self.segment_time_seconds = int(os.getenv("SEGMENT_TIME_SECONDS", "2"))
         self.segment_wrap_count = int(os.getenv("SEGMENT_WRAP_COUNT", "120"))
         self.poll_interval_seconds = int(os.getenv("POLL_INTERVAL_SECONDS", "3"))
+        self.snapshot_interval_seconds = int(os.getenv("SNAPSHOT_INTERVAL_SECONDS", "2"))
         self.storage_root = Path(os.getenv("STORAGE_ROOT", "./storage")).resolve()
         self.buffer_dir = self.storage_root / "buffer" / self.camera_id
         self.output_dir = self.storage_root / "replays"
+        self.snapshot_dir = self.storage_root / "snapshots"
         self.ffmpeg = shutil.which(os.getenv("FFMPEG_BIN", "ffmpeg"))
         self.ffprobe = shutil.which(os.getenv("FFPROBE_BIN", "ffprobe"))
         self.process: subprocess.Popen | None = None
@@ -62,6 +64,7 @@ class CaptureServer:
         self.ffmpeg_log_path = self.storage_root / "logs" / f"ffmpeg_{self.camera_id}.log"
         self.last_reported_status: str | None = None
         self.last_status_report_at = 0.0
+        self.last_snapshot_upload_at = 0.0
         self.session = requests.Session()
         self.session.headers.update({"X-Operator-Token": self.operator_token})
 
@@ -70,6 +73,7 @@ class CaptureServer:
 
         self.buffer_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.snapshot_dir.mkdir(parents=True, exist_ok=True)
         self.ffmpeg_log_path.parent.mkdir(parents=True, exist_ok=True)
 
     def run(self) -> None:
@@ -82,6 +86,7 @@ class CaptureServer:
 
         while True:
             self.ensure_buffer_running()
+            self.upload_live_snapshot()
             self.poll_pending_requests()
             time.sleep(self.poll_interval_seconds)
 
@@ -371,6 +376,56 @@ class CaptureServer:
                 timeout=120,
             )
         response.raise_for_status()
+
+    def upload_live_snapshot(self) -> None:
+        now = time.time()
+        if now - self.last_snapshot_upload_at < self.snapshot_interval_seconds:
+            return
+
+        segment = self.latest_closed_segment()
+        if not segment:
+            return
+
+        snapshot_file = self.snapshot_dir / f"{self.camera_id}_live.jpg"
+        command = [
+            self.ffmpeg,
+            "-hide_banner",
+            "-nostdin",
+            "-y",
+            "-i",
+            str(segment),
+            "-frames:v",
+            "1",
+            "-q:v",
+            "3",
+            str(snapshot_file),
+        ]
+        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=15)
+        if result.returncode != 0 or not snapshot_file.exists() or snapshot_file.stat().st_size == 0:
+            logging.debug("Snapshot ao vivo indisponivel: %s", redact(result.stderr))
+            return
+
+        try:
+            with snapshot_file.open("rb") as stream:
+                response = self.session.post(
+                    f"{self.backend_api_url}/cameras/{self.camera_id}/snapshot",
+                    files={"file": (snapshot_file.name, stream, "image/jpeg")},
+                    timeout=15,
+                )
+            response.raise_for_status()
+            self.last_snapshot_upload_at = now
+        except requests.RequestException as exc:
+            logging.debug("Nao foi possivel enviar snapshot ao vivo: %s", exc)
+
+    def latest_closed_segment(self) -> Path | None:
+        segments = [
+            segment
+            for segment in self.buffer_dir.glob("segment_*.ts")
+            if segment.is_file() and segment.stat().st_size > 0 and self.is_closed_segment(segment)
+        ]
+        if not segments:
+            return None
+        return max(segments, key=lambda path: path.stat().st_mtime)
 
     def fail_request(self, request_id: int, message: str) -> None:
         try:

@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     cameras_config_path: str = "../config/cameras.json"
     replay_root: str = "./storage/replays"
+    live_snapshot_root: str = "./storage/live"
     log_root: str = "./storage/logs"
     default_replay_seconds: int = 15
 
@@ -32,6 +33,10 @@ class Settings(BaseSettings):
     @property
     def log_path(self) -> Path:
         return Path(self.log_root).resolve()
+
+    @property
+    def live_snapshot_path(self) -> Path:
+        return Path(self.live_snapshot_root).resolve()
 
     @property
     def cameras_path(self) -> Path:

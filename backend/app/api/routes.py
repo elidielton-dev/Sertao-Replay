@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
@@ -63,6 +64,10 @@ def _log(db: Session, source: str, level: str, message: str, camera_id: str | No
     )
 
 
+def _safe_camera_file_id(camera_id: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]+", "_", camera_id).strip("_") or "camera"
+
+
 @router.get("/health")
 def health():
     return {"ok": True, "message": "Sertao Replay API online"}
@@ -115,6 +120,45 @@ def update_camera_status(
     _log(db, "capture-server", "info", message or f"Camera {camera_id}: {status}", camera_id)
     db.commit()
     return {"ok": True, "camera_id": camera_id, "status": status}
+
+
+@router.post("/cameras/{camera_id}/snapshot")
+def upload_camera_snapshot(
+    camera_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
+    if file.content_type and file.content_type not in {"image/jpeg", "image/jpg"}:
+        raise HTTPException(status_code=400, detail="Envie um snapshot JPEG.")
+
+    try:
+        camera_service.get_camera(db, camera_id, include_disabled=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    settings.live_snapshot_path.mkdir(parents=True, exist_ok=True)
+    snapshot_path = settings.live_snapshot_path / f"{_safe_camera_file_id(camera_id)}.jpg"
+    with snapshot_path.open("wb") as output:
+        while chunk := file.file.read(1024 * 1024):
+            output.write(chunk)
+
+    camera_service.update_status(db, camera_id, "recording")
+    db.commit()
+    return {"ok": True, "camera_id": camera_id, "snapshot_url": f"/api/cameras/{camera_id}/snapshot.jpg"}
+
+
+@router.get("/cameras/{camera_id}/snapshot.jpg")
+def get_camera_snapshot(camera_id: str):
+    snapshot_path = settings.live_snapshot_path / f"{_safe_camera_file_id(camera_id)}.jpg"
+    if not snapshot_path.exists():
+        raise HTTPException(status_code=404, detail="Snapshot ao vivo indisponivel.")
+
+    return FileResponse(
+        path=snapshot_path,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @router.get("/replays")
