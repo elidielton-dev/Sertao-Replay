@@ -120,7 +120,10 @@ class CaptureServer:
     def start_buffer(self, clear_buffer: bool = False) -> None:
         if clear_buffer:
             for segment in self.buffer_dir.glob("segment_*.ts"):
-                segment.unlink(missing_ok=True)
+                try:
+                    segment.unlink(missing_ok=True)
+                except PermissionError:
+                    logging.warning("Segmento em uso ao limpar buffer, mantendo arquivo: %s", segment.name)
 
         pattern = str(self.buffer_dir / "segment_%03d.ts")
         command = [

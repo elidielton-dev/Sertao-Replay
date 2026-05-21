@@ -2,6 +2,7 @@ from sqlalchemy import text
 
 from app.core.logging import get_logger
 from app.db.session import Base, engine
+from app.models.chat import ChatMessage  # noqa: F401
 from app.models.camera import CameraConfig  # noqa: F401
 from app.models.event import ReplayEvent  # noqa: F401
 from app.models.replay import Replay  # noqa: F401

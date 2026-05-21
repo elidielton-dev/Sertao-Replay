@@ -666,11 +666,16 @@ function storedWebrtcUrl(cameraId) {
   }
 
   try {
-    return (
+    const storedUrl =
       window.localStorage.getItem(`${WEBRTC_URL_STORAGE_PREFIX}${cameraId}`) ||
       window.localStorage.getItem("sertao_webrtc_url") ||
-      ""
-    );
+      "";
+    const oldLocalDefault = new RegExp(`/(${cameraId})/whep$`, "i");
+    if (storedUrl && WEBRTC_BASE && oldLocalDefault.test(storedUrl)) {
+      return "";
+    }
+
+    return storedUrl;
   } catch {
     return "";
   }
@@ -708,7 +713,7 @@ function webrtcUrlForCamera(camera) {
   }
 
   if (WEBRTC_BASE) {
-    return `${WEBRTC_BASE}/${encodeURIComponent(camera.id)}/whep`;
+    return `${WEBRTC_BASE}/${encodeURIComponent(`${camera.id}-live`)}/whep`;
   }
 
   return `${API_BASE}/cameras/${encodeURIComponent(camera.id)}/webrtc/offer`;
@@ -1075,18 +1080,47 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
   );
 }
 
-const chatSeed = [
-  { user: "Joao Silva", initials: "JS", text: "Que jogada sensacional!" },
-  { user: "Maria Oliveira", initials: "MO", text: "VAAAI MEU TIME!" },
-  { user: "Ricardo Costa", initials: "RC", text: "O goleiro salvou demais agora." },
-  { user: "Sertao Fan", initials: "SF", text: "Transmissao lisa por aqui." },
-  { user: "Camila", initials: "CA", text: "Esse replay vai ficar bonito." },
-];
+const STREAM_CHAT_STORAGE_KEY = "sertao_stream_chat_messages";
+const STREAM_CHAT_USER = "admin";
+
+function chatInitials(name) {
+  const parts = String(name || "Torcedor")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  return (parts.map((part) => part[0]).join("") || "TR").toUpperCase();
+}
+
+function loadStoredChatMessages() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const data = JSON.parse(window.localStorage.getItem(STREAM_CHAT_STORAGE_KEY) || "[]");
+    return Array.isArray(data) ? data.slice(-80) : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeChatMessage(item) {
+  return {
+    id: item.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    user: item.user || STREAM_CHAT_USER,
+    initials: item.initials || chatInitials(item.user || STREAM_CHAT_USER),
+    text: item.text || "",
+    createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+  };
+}
 
 function StreamingPage() {
   const videoRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const reconnectTimerRef = useRef(null);
+  const chatEndRef = useRef(null);
   const [cameras, setCameras] = useState([]);
   const [replays, setReplays] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -1094,10 +1128,10 @@ function StreamingPage() {
   const [selectedCameraId, setSelectedCameraId] = useState("");
   const [webrtcStatus, setWebrtcStatus] = useState("idle");
   const [webrtcError, setWebrtcError] = useState("");
-  const [webrtcUrlInput, setWebrtcUrlInput] = useState("");
   const [webrtcConfigVersion, setWebrtcConfigVersion] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState(chatSeed);
+  const [chatMessages, setChatMessages] = useState(() => loadStoredChatMessages());
+  const [chatDraft, setChatDraft] = useState("");
 
   useEffect(() => {
     async function loadStreamingData() {
@@ -1121,13 +1155,26 @@ function StreamingPage() {
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setChatMessages((current) => {
-        const next = chatSeed[Math.floor(Math.random() * chatSeed.length)];
-        return [...current.slice(-24), next];
-      });
-    }, 5000);
-    return () => window.clearInterval(timer);
+    try {
+      window.localStorage.setItem(STREAM_CHAT_STORAGE_KEY, JSON.stringify(chatMessages.slice(-80)));
+    } catch {
+      // localStorage can be unavailable in private browser contexts.
+    }
+  }, [chatMessages]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ block: "end" });
+  }, [chatMessages.length]);
+
+  useEffect(() => {
+    function syncChat(event) {
+      if (event.key === STREAM_CHAT_STORAGE_KEY) {
+        setChatMessages(loadStoredChatMessages());
+      }
+    }
+
+    window.addEventListener("storage", syncChat);
+    return () => window.removeEventListener("storage", syncChat);
   }, []);
 
   const selectedCamera = cameras.find((camera) => camera.id === selectedCameraId) || cameras[0];
@@ -1137,6 +1184,35 @@ function StreamingPage() {
   const cameraReplays = selectedCamera
     ? replays.filter((replay) => replay.status === "ready" && replay.camera_id === selectedCamera.id && replay.video_url).slice(0, 6)
     : [];
+
+  useEffect(() => {
+    if (!selectedCameraId) {
+      setChatMessages(loadStoredChatMessages());
+      return undefined;
+    }
+
+    let cancelled = false;
+    async function loadChatMessages() {
+      try {
+        const data = await apiRequest(`/chat/messages?camera_id=${encodeURIComponent(selectedCameraId)}&limit=80`);
+        if (!cancelled && Array.isArray(data)) {
+          setChatMessages(data.map(normalizeChatMessage));
+        }
+      } catch {
+        if (!cancelled) {
+          setChatMessages(loadStoredChatMessages());
+        }
+      }
+    }
+
+    loadChatMessages();
+    const timer = window.setInterval(loadChatMessages, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [selectedCameraId]);
+
   const isLive = webrtcStatus === "connected" || webrtcStatus === "receiving";
   const streamStatusLabel =
     webrtcStatus === "connected" || webrtcStatus === "receiving"
@@ -1159,10 +1235,6 @@ function StreamingPage() {
       setWebrtcConfigVersion((current) => current + 1);
     }, 3000);
   }, []);
-
-  useEffect(() => {
-    setWebrtcUrlInput(effectiveWebrtcUrl);
-  }, [effectiveWebrtcUrl, selectedCamera?.id]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -1285,15 +1357,36 @@ function StreamingPage() {
     };
   }, [effectiveWebrtcUrl, scheduleWebrtcReconnect, selectedCamera?.id, webrtcConfigVersion]);
 
-  function handleSaveWebrtcUrl(event) {
+  async function handleSendChat(event) {
     event.preventDefault();
-    if (!selectedCamera?.id) {
+    const text = chatDraft.trim();
+    const user = STREAM_CHAT_USER;
+    if (!text) {
       return;
     }
 
-    saveStoredWebrtcUrl(selectedCamera.id, webrtcUrlInput);
-    setMessage(webrtcUrlInput.trim() ? "URL WebRTC salva para esta camera." : "URL WebRTC removida desta camera.");
-    setWebrtcConfigVersion((current) => current + 1);
+    const fallbackMessage = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      user,
+      initials: chatInitials(user),
+      text,
+      createdAt: new Date().toISOString(),
+    };
+
+    setChatDraft("");
+    try {
+      const saved = await apiRequest("/chat/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          camera_id: selectedCamera?.id || null,
+          user,
+          text,
+        }),
+      });
+      setChatMessages((current) => [...current.slice(-79), normalizeChatMessage(saved)]);
+    } catch {
+      setChatMessages((current) => [...current.slice(-79), fallbackMessage]);
+    }
   }
 
   return (
@@ -1350,14 +1443,6 @@ function StreamingPage() {
               </div>
             ) : null}
 
-            <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/55 px-3 py-1 backdrop-blur">
-              <span className={`h-2 w-2 rounded-full ${isLive ? "animate-pulse bg-[#a1fb00]" : "bg-[#ffb4ab]"}`} />
-              <span className="text-xs font-bold text-white">
-                {webrtcStatus === "connected" || webrtcStatus === "receiving"
-                  ? "Transmitindo ao vivo por WebRTC"
-                  : streamStatusLabel}
-              </span>
-            </div>
           </div>
 
           <section className="space-y-4">
@@ -1391,28 +1476,6 @@ function StreamingPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-[#414a34]/60 bg-[#181c1b] p-4">
-            <div className="mb-2 flex flex-wrap gap-4 text-sm font-bold text-white">
-              <span>{isLive ? "Online agora" : "Status: " + streamStatusLabel}</span>
-              <span>{cameraReplays.length} highlights recentes</span>
-            </div>
-            <form className="grid gap-3 md:grid-cols-[1fr_auto]" onSubmit={handleSaveWebrtcUrl}>
-              <input
-                className="min-w-0 rounded-lg border border-[#414a34] bg-[#0b0f0e] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#8a947a] focus:border-[#a1fb00] focus:ring-0"
-                onChange={(event) => setWebrtcUrlInput(event.target.value)}
-                placeholder="https://seu-gateway-webrtc/campo-01/whep"
-                type="text"
-                value={webrtcUrlInput}
-              />
-              <button className="rounded-lg bg-[#a1fb00] px-5 py-3 text-sm font-black uppercase tracking-[0.08em] text-[#102000] transition hover:opacity-90 active:scale-95" type="submit">
-                Salvar live
-              </button>
-            </form>
-            <p className="mt-3 mb-0 text-xs leading-relaxed text-[#c0caad]">
-              Live fica no WebRTC. Replays gravados aparecem abaixo como highlights.
-            </p>
-          </section>
-
           <section className="space-y-4">
             <h2 className="text-2xl font-black text-white">Highlights recentes</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -1441,26 +1504,47 @@ function StreamingPage() {
                 <span className="h-2 w-2 animate-pulse rounded-full bg-[#a1fb00]" />
                 Chat ao Vivo
               </h2>
-              <span className="text-[#c0caad]">...</span>
+              <span className="text-xs font-bold text-[#c0caad]">{chatMessages.length}</span>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              {!chatMessages.length ? (
+                <div className="rounded-xl border border-[#414a34] bg-[#181c1b] p-4 text-sm text-[#c0caad]">
+                  Seja o primeiro a comentar nessa live.
+                </div>
+              ) : null}
+
               {chatMessages.map((item, index) => (
-                <div className="flex gap-3" key={`${item.user}-${index}`}>
+                <div className="flex gap-3" key={item.id || `${item.user}-${index}`}>
                   <div className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full border border-[#8ddc00]/10 bg-[#363a38] text-xs">{item.initials}</div>
                   <div>
-                    <span className="text-xs font-bold text-[#a1fb00]">{item.user}</span>
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <span className="text-xs font-bold text-[#a1fb00]">{item.user}</span>
+                      {item.createdAt ? <span className="text-[10px] text-[#8a947a]">{formatDate(item.createdAt)}</span> : null}
+                    </div>
                     <p className="m-0 text-sm text-white">{item.text}</p>
                   </div>
                 </div>
               ))}
+
+              <div ref={chatEndRef} />
             </div>
             <div className="border-t border-[#8ddc00]/20 bg-[#1c201f] p-4">
-              <div className="flex items-center gap-2">
-                <input className="min-w-0 flex-1 rounded-t-md border-0 border-b border-[#8ddc00]/30 bg-[#101413] px-3 py-2 text-sm text-white focus:border-[#a1fb00] focus:ring-0" placeholder="Diga algo..." type="text" />
-                <button className="rounded-full p-2 text-[#a1fb00] transition hover:bg-[#a1fb00]/10" type="button" aria-label="Enviar mensagem">
-                  <Send size={18} />
-                </button>
-              </div>
+              <form className="space-y-2" onSubmit={handleSendChat}>
+                <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#8a947a]">admin</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    className="min-w-0 flex-1 rounded-t-md border-0 border-b border-[#8ddc00]/30 bg-[#101413] px-3 py-2 text-sm text-white outline-none focus:border-[#a1fb00] focus:ring-0"
+                    maxLength={240}
+                    onChange={(event) => setChatDraft(event.target.value)}
+                    placeholder="Diga algo..."
+                    type="text"
+                    value={chatDraft}
+                  />
+                  <button className="rounded-full p-2 text-[#a1fb00] transition hover:bg-[#a1fb00]/10 disabled:opacity-40" disabled={!chatDraft.trim()} type="submit" aria-label="Enviar mensagem">
+                    <Send size={18} />
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </aside>

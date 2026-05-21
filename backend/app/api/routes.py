@@ -7,12 +7,14 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.sanitize import truncate_text
 from app.db.session import get_db
+from app.models.chat import ChatMessage
 from app.models.event import ReplayEvent
 from app.models.replay_request import ReplayRequestQueue
 from app.models.system_log import SystemLog
@@ -28,6 +30,12 @@ camera_service = CameraService()
 replay_service = ReplayService()
 settings = get_settings()
 DEFAULT_WEBRTC_WHEP_URL_MAP = "campo-01=http://187.19.251.46:8889/campo-01-live/whep"
+
+
+class ChatMessageCreate(BaseModel):
+    camera_id: str | None = Field(default=None, max_length=64)
+    user: str = Field(min_length=1, max_length=80)
+    text: str = Field(min_length=1, max_length=500)
 
 
 def require_operator(
@@ -71,6 +79,23 @@ def _log(db: Session, source: str, level: str, message: str, camera_id: str | No
 
 def _safe_camera_file_id(camera_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]+", "_", camera_id).strip("_") or "camera"
+
+
+def _chat_initials(name: str) -> str:
+    parts = [part for part in re.split(r"\s+", name.strip()) if part][:2]
+    initials = "".join(part[0] for part in parts).upper()
+    return initials[:4] or "TR"
+
+
+def _chat_response(record: ChatMessage) -> dict[str, object]:
+    return {
+        "id": record.id,
+        "camera_id": record.camera_id,
+        "user": record.user,
+        "initials": record.initials,
+        "text": record.text,
+        "created_at": record.created_at.isoformat(),
+    }
 
 
 def _webrtc_url_map() -> dict[str, str]:
@@ -120,6 +145,41 @@ def _post_webrtc_offer(offer_url: str, offer_sdp: bytes) -> bytes:
 @router.get("/health")
 def health():
     return {"ok": True, "message": "Sertao Replay API online"}
+
+
+@router.get("/chat/messages")
+def list_chat_messages(
+    camera_id: str | None = None,
+    limit: int = 80,
+    db: Session = Depends(get_db),
+):
+    safe_limit = min(max(limit, 1), 200)
+    query = db.query(ChatMessage)
+    if camera_id:
+        query = query.filter(ChatMessage.camera_id == camera_id)
+
+    records = query.order_by(ChatMessage.created_at.desc()).limit(safe_limit).all()
+    return [_chat_response(record) for record in reversed(records)]
+
+
+@router.post("/chat/messages")
+def create_chat_message(payload: ChatMessageCreate, db: Session = Depends(get_db)):
+    user = truncate_text(payload.user.strip(), 80) or "Torcedor"
+    text = truncate_text(payload.text.strip(), 500)
+    camera_id = truncate_text((payload.camera_id or "").strip(), 64) or None
+    if not text:
+        raise HTTPException(status_code=400, detail="Mensagem vazia.")
+
+    record = ChatMessage(
+        camera_id=camera_id,
+        user=user,
+        initials=_chat_initials(user),
+        text=text,
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return _chat_response(record)
 
 
 @router.get("/cameras")
