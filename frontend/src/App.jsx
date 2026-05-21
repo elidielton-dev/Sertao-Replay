@@ -1,4 +1,4 @@
-import {
+﻿import {
   Activity,
   Camera,
   CheckCircle2,
@@ -12,6 +12,7 @@ import {
   Send,
   Settings,
   Video,
+  X,
 } from "lucide-react";
 import Hls from "hls.js";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -122,26 +123,26 @@ function fieldNumber(value) {
 const cameras = [
   {
     id: "1",
-    name: "Câmera 1",
+    name: "CÃ¢mera 1",
     position: "Lateral esquerda",
     image: "https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&q=80&w=640",
   },
   {
     id: "2",
-    name: "Câmera 2",
+    name: "CÃ¢mera 2",
     position: "Meio-campo",
     image: "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?auto=format&fit=crop&q=80&w=640",
   },
   {
     id: "3",
-    name: "Câmera 3",
+    name: "CÃ¢mera 3",
     position: "Gol norte",
     image: "https://images.unsplash.com/photo-1570498839593-e565b39455fc?auto=format&fit=crop&q=80&w=640",
   },
   {
     id: "4",
-    name: "Câmera 4",
-    position: "Visão geral",
+    name: "CÃ¢mera 4",
+    position: "VisÃ£o geral",
     image: "https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?auto=format&fit=crop&q=80&w=640",
   },
 ];
@@ -161,7 +162,7 @@ function parseCameraIdentity(camera, index = 0) {
     return null;
   }
 
-  const cameraNameMatch = String(camera?.name || "").match(/c[aâ]mera\s*0?(\d+)/i);
+  const cameraNameMatch = String(camera?.name || "").match(/c[aÃ¢]mera\s*0?(\d+)/i);
   return {
     fieldId: String(Number(fieldNameMatch[1])),
     cameraId: String(Number(cameraNameMatch?.[1] || index + 1)),
@@ -191,7 +192,7 @@ function buildRegisteredFields(apiCameras = []) {
         fieldId: identity.fieldId,
         href: cameraRoute(identity.fieldId, identity.cameraId),
         image: template.image,
-        name: camera.name || `Câmera ${identity.cameraId}`,
+        name: camera.name || `CÃ¢mera ${identity.cameraId}`,
         position: camera.notes || template.position,
         status: camera.status || "unknown",
       };
@@ -311,16 +312,16 @@ function FieldCard({ field }) {
   return (
     <a
       href={field.href}
-      className={`glass-card group flex cursor-pointer items-center justify-between rounded-2xl ${
-        large ? "col-span-2 p-5 max-[420px]:col-span-1 lg:col-span-1 lg:p-6" : "p-4 lg:p-6"
+      className={`glass-card group flex min-w-0 cursor-pointer items-center justify-between gap-3 rounded-2xl ${
+        large ? "col-span-2 p-4 max-[420px]:col-span-1 sm:p-5 lg:col-span-1 lg:p-6" : "p-4 lg:p-6"
       }`}
       aria-label={`Abrir Campo ${field.number}`}
     >
-      <div className={`flex items-center ${large ? "gap-4" : "gap-3"}`}>
+      <div className={`flex min-w-0 items-center ${large ? "gap-4" : "gap-3"}`}>
         <div className="text-gray-400 transition group-hover:text-neon-green">
           <FieldIcon className={large ? "h-10 w-10 lg:h-12 lg:w-12" : "h-8 w-8 lg:h-12 lg:w-12"} />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className={`${large ? "text-xs" : "text-[10px]"} mb-0 font-bold uppercase leading-tight text-gray-400 lg:text-xs`}>
             Campo
           </p>
@@ -329,21 +330,21 @@ function FieldCard({ field }) {
           </p>
         </div>
       </div>
-      <ChevronIcon className={`${large ? "h-6 w-6" : "h-5 w-5"} text-neon-green lg:h-7 lg:w-7`} />
+      <ChevronIcon className={`${large ? "h-6 w-6" : "h-5 w-5"} shrink-0 text-neon-green lg:h-7 lg:w-7`} />
     </a>
   );
 }
 
 function SponsorCard({ sponsor }) {
   return (
-    <div className="glass-card flex items-center gap-3 rounded-2xl p-4 lg:min-h-[104px] lg:p-5">
+    <div className="glass-card flex min-w-0 items-center gap-3 rounded-2xl p-4 lg:min-h-[104px] lg:p-5">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 lg:h-12 lg:w-12">
         <svg className="h-6 w-6 text-white/50 lg:h-7 lg:w-7" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           {sponsor.icon}
         </svg>
       </div>
       <div className="min-w-0">
-        <p className="mb-0 text-[8px] font-bold uppercase leading-tight text-gray-400 lg:text-[10px]">Patrocinador</p>
+        <p className="mb-0 break-words text-[8px] font-bold uppercase leading-tight text-gray-400 lg:text-[10px]">Patrocinador</p>
         <p className="mb-0 text-sm font-black text-neon-green lg:text-xl">{sponsor.number}</p>
       </div>
     </div>
@@ -352,22 +353,22 @@ function SponsorCard({ sponsor }) {
 
 function HomeNav() {
   return (
-    <nav className="relative z-10 w-full" aria-label="Navegação principal">
-      <div className="grid gap-5 border-t border-[#5d2bff] bg-black/90 px-5 py-5 shadow-[0_18px_50px_rgba(0,0,0,0.55)] backdrop-blur-md sm:px-7 lg:min-h-[82px] lg:grid-cols-[260px_1fr_260px] lg:items-center lg:gap-0 lg:px-0 lg:py-0">
+    <nav className="relative z-10 w-full" aria-label="NavegaÃ§Ã£o principal">
+      <div className="grid gap-4 border-t border-[#5d2bff] bg-black/90 px-4 py-5 shadow-[0_18px_50px_rgba(0,0,0,0.55)] backdrop-blur-md sm:px-6 md:grid-cols-[220px_minmax(0,1fr)] md:items-center lg:min-h-[82px] lg:grid-cols-[260px_1fr_260px] lg:gap-0 lg:px-0 lg:py-0">
         <a
-          className="flex w-fit items-center transition hover:opacity-90 lg:h-full lg:border-r lg:border-neon-green/10 lg:px-6"
+          className="flex w-fit min-w-0 items-center transition hover:opacity-90 lg:h-full lg:border-r lg:border-neon-green/10 lg:px-6"
           href="/"
-          aria-label="Sertão Replay - início"
+          aria-label="SertÃ£o Replay - inÃ­cio"
         >
           <img
-            alt="Sertão Replay"
+            alt="SertÃ£o Replay"
             className="h-10 w-auto object-contain sm:h-11 lg:h-12"
             src="/assets/logo-sertao-replay-nav.png"
           />
         </a>
 
-        <div className="flex items-center justify-center overflow-x-auto">
-          <div className="flex items-center gap-7 whitespace-nowrap text-[11px] font-black uppercase tracking-[0.24em] text-[#9fb4c9] sm:gap-10">
+        <div className="flex min-w-0 items-center justify-start overflow-x-auto md:justify-center">
+          <div className="flex items-center gap-5 whitespace-nowrap text-[10px] font-black uppercase tracking-[0.16em] text-[#9fb4c9] sm:gap-8 sm:text-[11px] sm:tracking-[0.2em] lg:gap-10 lg:tracking-[0.24em]">
             {navItems.map((item) => (
               <a
                 className="transition hover:text-neon-green focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neon-green"
@@ -409,12 +410,12 @@ function HomePage() {
   }, []);
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden bg-dark-bg text-white shadow-[0_0_80px_rgba(0,0,0,0.45)] lg:max-w-6xl lg:overflow-visible lg:bg-transparent lg:px-6 xl:px-0">
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden bg-dark-bg text-white shadow-[0_0_80px_rgba(0,0,0,0.45)] sm:max-w-2xl md:max-w-4xl lg:max-w-6xl lg:overflow-visible lg:bg-transparent lg:px-6 xl:px-0">
       <header className="relative z-10" data-purpose="page-header">
         <HomeNav />
       </header>
 
-      <section id="streaming" className="mb-8 space-y-4 px-6 pt-6 lg:mb-10 lg:px-0 lg:pt-10" data-purpose="field-selection" aria-label="Seleção de campo">
+      <section id="streaming" className="mb-8 space-y-4 px-4 pt-6 sm:px-6 lg:mb-10 lg:px-0 lg:pt-10" data-purpose="field-selection" aria-label="SeleÃ§Ã£o de campo">
         {fieldsStatus === "loading" ? (
           <div className="glass-card rounded-2xl p-5 text-sm font-bold text-gray-300">Carregando campos cadastrados...</div>
         ) : null}
@@ -434,7 +435,7 @@ function HomePage() {
         ) : null}
 
         {registeredFields.length ? (
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 lg:gap-5">
             {registeredFields.map((field) => (
               <FieldCard field={field} key={field.id} />
             ))}
@@ -442,13 +443,13 @@ function HomePage() {
         ) : null}
       </section>
 
-      <section className="mb-8 px-6 lg:mb-10 lg:px-0" id="highlights" data-purpose="highlights">
+      <section className="mb-8 px-4 sm:px-6 lg:mb-10 lg:px-0" id="highlights" data-purpose="highlights">
         <div className="mb-4 flex items-center gap-2 lg:mb-5">
           <StarIcon />
           <h2 className="m-0 text-lg font-black uppercase tracking-wide lg:text-2xl">Algum Destaque</h2>
         </div>
 
-        <article className="glass-card relative flex min-h-[220px] items-end overflow-hidden rounded-3xl lg:min-h-[360px]">
+        <article className="glass-card relative flex min-h-[220px] items-end overflow-hidden rounded-3xl sm:min-h-[280px] lg:min-h-[360px]">
           <div className="absolute inset-0 z-0">
             <img
               alt="Lance em campo de futebol"
@@ -458,20 +459,20 @@ function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
           </div>
 
-          <div className="relative z-10 w-full p-5 lg:p-8">
+          <div className="relative z-10 w-full p-5 sm:p-6 lg:p-8">
             <span className="mb-3 inline-block rounded-full border border-neon-green/30 bg-neon-green/10 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-neon-green lg:mb-4 lg:text-[10px]">
               Destaque da semana
             </span>
-            <h3 className="mb-2 text-xl font-black uppercase leading-tight lg:text-4xl">
+            <h3 className="mb-2 max-w-[24rem] text-xl font-black uppercase leading-tight sm:text-3xl lg:text-4xl">
               Melhores Momentos
               <br />
               Final do Campeonato
             </h3>
-            <p className="mb-4 max-w-[200px] text-[11px] text-gray-300 lg:max-w-sm lg:text-sm">
-              Confira os melhores lances e todos os detalhes da grande decisão.
+            <p className="mb-4 max-w-[16rem] text-[11px] text-gray-300 sm:max-w-xs sm:text-sm lg:max-w-sm">
+              Confira os melhores lances e todos os detalhes da grande decisÃ£o.
             </p>
             <button
-              className="flex items-center gap-2 rounded-lg bg-neon-green px-4 py-2 text-xs font-black uppercase text-black transition hover:opacity-90 active:scale-95 lg:px-5 lg:py-3"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-neon-green px-4 py-2 text-xs font-black uppercase text-black transition hover:opacity-90 active:scale-95 lg:px-5 lg:py-3"
               type="button"
             >
               <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
@@ -481,8 +482,8 @@ function HomePage() {
             </button>
           </div>
 
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-30 lg:right-10" aria-hidden="true">
-            <svg className="h-32 w-32 text-neon-green lg:h-56 lg:w-56" fill="none" viewBox="0 0 24 24">
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-20 sm:right-4 sm:opacity-30 lg:right-10" aria-hidden="true">
+            <svg className="h-28 w-28 text-neon-green sm:h-40 sm:w-40 lg:h-56 lg:w-56" fill="none" viewBox="0 0 24 24">
               <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20ZM10 8V16L16 12L10 8Z" fill="currentColor" />
             </svg>
           </div>
@@ -497,27 +498,27 @@ function HomePage() {
         </article>
       </section>
 
-      <section id="tournaments" className="mb-12 px-6 lg:mb-16 lg:px-0" data-purpose="sponsors">
+      <section id="tournaments" className="mb-12 px-4 sm:px-6 lg:mb-16 lg:px-0" data-purpose="sponsors">
         <div className="mb-4 flex items-center gap-2 lg:mb-5">
           <BriefcaseIcon />
           <h2 className="m-0 text-lg font-black uppercase tracking-wide lg:text-2xl">Patrocinadores</h2>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 lg:gap-5">
           {sponsors.map((sponsor) => (
             <SponsorCard sponsor={sponsor} key={sponsor.number} />
           ))}
         </div>
       </section>
 
-      <footer className="mt-auto flex items-center justify-between border-t border-white/5 px-6 py-8 lg:rounded-t-3xl lg:bg-white/[0.02] lg:px-10" data-purpose="page-footer">
+      <footer className="mt-auto flex flex-wrap items-center justify-center gap-4 border-t border-white/5 px-4 py-8 sm:px-6 lg:justify-between lg:rounded-t-3xl lg:bg-white/[0.02] lg:px-10" data-purpose="page-footer">
         <div className="h-px flex-1 bg-white/10" />
-        <div className="flex items-center gap-4 px-6">
-          <span className="whitespace-nowrap text-[9px] font-black uppercase tracking-widest text-gray-400">Sertão Replay</span>
+        <div className="flex min-w-0 flex-wrap items-center justify-center gap-3 px-0 sm:gap-4 lg:px-6">
+          <span className="whitespace-nowrap text-[9px] font-black uppercase tracking-widest text-gray-400">SertÃ£o Replay</span>
           <div className="text-neon-green">
             <PlayCircleIcon className="h-5 w-5" />
           </div>
-          <span className="whitespace-nowrap text-[9px] font-black uppercase tracking-widest text-gray-400">Replay é emoção</span>
+          <span className="whitespace-nowrap text-[9px] font-black uppercase tracking-widest text-gray-400">Replay Ã© emoÃ§Ã£o</span>
         </div>
         <div className="h-px flex-1 bg-white/10" />
       </footer>
@@ -551,13 +552,13 @@ function FieldMonitorIcon() {
 function CameraCard({ camera, fieldId }) {
   return (
     <a
-      className="group relative grid min-h-[150px] grid-cols-1 gap-4 rounded-[8px] border border-white/5 bg-[#181c1b]/60 p-3 text-left text-white no-underline transition hover:border-[#a4ff00]/60 hover:bg-[#181c1b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#a4ff00] sm:grid-cols-[160px_minmax(0,1fr)]"
+      className="group relative grid min-h-[150px] min-w-0 grid-cols-1 gap-4 rounded-[8px] border border-white/5 bg-[#181c1b]/60 p-3 text-left text-white no-underline transition hover:border-[#a4ff00]/60 hover:bg-[#181c1b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#a4ff00] sm:grid-cols-[minmax(8rem,10rem)_minmax(0,1fr)]"
       href={cameraRoute(fieldId, camera.id)}
       aria-label={`Abrir ${camera.name} do Campo ${fieldId}`}
     >
       <img
         alt={`Preview ${camera.name}`}
-        className="h-full min-h-[126px] w-full rounded-md object-cover opacity-70 transition group-hover:opacity-100"
+        className="aspect-video h-auto min-h-[126px] w-full rounded-md object-cover opacity-70 transition group-hover:opacity-100 sm:h-full"
         src={camera.image}
       />
 
@@ -604,21 +605,21 @@ function CampoPage({ fieldId }) {
   const field = registeredFields.find((item) => item.id === String(fieldId));
 
   return (
-    <main className="min-h-screen bg-[#0b0f0e] px-6 py-6 font-anybody text-white lg:px-10 lg:py-8">
+    <main className="min-h-screen bg-[#0b0f0e] px-4 py-5 font-anybody text-white sm:px-6 lg:px-10 lg:py-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
-        <header className="flex items-center justify-between" data-purpose="main-header">
+        <header className="flex flex-wrap items-center justify-between gap-4" data-purpose="main-header">
           <a className="flex items-center" href="/" aria-label="Voltar para a Home">
             <img alt="Sertao Replay" className="h-11 w-auto object-contain lg:h-14" src="/assets/logo-sertao-replay-nav.png" />
           </a>
-          <a className="rounded-full border border-gray-600 px-5 py-2 text-sm font-bold text-gray-300 transition hover:border-[#a4ff00] hover:text-[#a4ff00]" href="/">
+          <a className="inline-flex min-h-10 items-center rounded-full border border-gray-600 px-5 py-2 text-sm font-bold text-gray-300 transition hover:border-[#a4ff00] hover:text-[#a4ff00]" href="/">
             Voltar
           </a>
         </header>
 
-        <section className="flex items-start gap-4" data-purpose="page-title">
+        <section className="flex min-w-0 items-start gap-4" data-purpose="page-title">
           <FieldMonitorIcon />
-          <div>
-            <h1 className="mb-1 flex items-center gap-3 text-4xl font-bold tracking-tight lg:text-5xl">
+          <div className="min-w-0">
+            <h1 className="mb-1 flex flex-wrap items-center gap-3 break-words text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
               Campo {field?.number || fieldNumber(fieldId)} <StatusDot className="h-2.5 w-2.5" />
             </h1>
             <p className="mb-0 text-gray-400">Escolha uma c&acirc;mera</p>
@@ -860,22 +861,22 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
 
   return (
     <main className="min-h-screen bg-[#0a0f0d] pb-28 text-white lg:pb-10">
-      <header className="sticky top-0 z-50 flex items-center justify-between bg-[#0a0f0d]/95 px-4 py-4 backdrop-blur-md lg:px-8" data-purpose="main-header">
+      <header className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 bg-[#0a0f0d]/95 px-4 py-4 backdrop-blur-md lg:px-8" data-purpose="main-header">
         <a className="flex items-center" href="/" aria-label="Voltar para a Home">
           <img alt="Sertao Replay" className="h-10 w-auto object-contain lg:h-12" src="/assets/logo-sertao-replay-nav.png" />
         </a>
       </header>
 
-      <div className="mx-auto grid w-full max-w-7xl gap-6 px-4 lg:grid-cols-[minmax(0,1fr)_390px] lg:px-8">
+      <div className="mx-auto grid w-full max-w-7xl gap-6 px-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,24.375rem)] lg:px-8">
         <section className="min-w-0">
           <section className="mb-4" data-purpose="camera-title-section">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg border border-[#79e043]/30 bg-[#1c221e] p-2 text-[#79e043]">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="shrink-0 rounded-lg border border-[#79e043]/30 bg-[#1c221e] p-2 text-[#79e043]">
                 <CameraGlyph className="h-5 w-5" />
               </div>
               <div className="min-w-0">
                 <h1 className="mb-0 flex flex-wrap items-center gap-2 break-words text-xl font-bold sm:text-2xl lg:text-4xl">
-                  {field ? `Campo ${field.number}` : "Campo"} <span className="text-3xl leading-none text-[#79e043]">•</span>{" "}
+                  {field ? `Campo ${field.number}` : "Campo"} <span className="text-3xl leading-none text-[#79e043]">â€¢</span>{" "}
                   <span className="text-[#79e043]">{camera?.name || "Camera"}</span>
                 </h1>
                 <p className="mb-0 text-sm text-[#a0a0a0]">{camera?.position || "Posicao indisponivel"}</p>
@@ -913,13 +914,13 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
                 <img alt="Campo de futebol" className="h-full w-full object-cover" src={previewImage} />
               )}
 
-              <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/40 px-3 py-1 backdrop-blur-sm">
+              <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/40 px-3 py-1 backdrop-blur-sm sm:left-4 sm:top-4">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-[#79e043]" />
                 <span className="text-xs font-medium">{selectedReplay ? "Replay selecionado" : "Online"}</span>
               </div>
 
               {selectedReplay ? (
-                <div className="absolute right-3 top-3 max-w-[min(250px,calc(100%-1.5rem))] rounded-xl bg-black/55 p-2 text-right backdrop-blur-sm sm:right-4 sm:top-14 sm:max-w-[min(360px,calc(100%-2rem))] sm:p-3">
+                <div className="absolute inset-x-3 bottom-3 max-h-[55%] overflow-hidden rounded-xl bg-black/55 p-2 text-left backdrop-blur-sm sm:inset-x-auto sm:bottom-auto sm:right-4 sm:top-14 sm:max-w-[min(360px,calc(100%-2rem))] sm:p-3 sm:text-right">
                   <div>
                     <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#79e043]">Assistindo agora</p>
                     <h2 className="m-0 line-clamp-2 text-sm font-black text-white sm:text-base lg:text-xl">{replayTitle(selectedReplay)}</h2>
@@ -937,15 +938,15 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
                     </svg>
                   </IconButton>
 
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                    <div className="flex items-center gap-4">
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 sm:p-4">
+                    <div className="flex items-center gap-3 sm:gap-4">
                       <button type="button" aria-label="Reproduzir">
                         <svg className="h-5 w-5 fill-current text-white" viewBox="0 0 24 24" aria-hidden="true">
                           <path d="M8 5v14l11-7z" />
                         </svg>
                       </button>
-                      <div className="flex flex-1 items-center gap-2">
-                        <span className="text-[10px] tabular-nums text-white">00:00 / 00:30</span>
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <span className="shrink-0 text-[10px] tabular-nums text-white">00:00 / 00:30</span>
                         <div className="relative h-1 flex-1 rounded-full bg-white/20">
                           <div className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-[#79e043]" />
                           <div className="absolute left-1/3 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-[#79e043] shadow-[0_0_10px_#79e043]" />
@@ -968,7 +969,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
             <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2">
               {replayFilters.map((filter, index) => (
                 <button
-                  className={`whitespace-nowrap rounded-xl border px-6 py-2 font-medium ${
+                  className={`min-h-10 whitespace-nowrap rounded-xl border px-4 py-2 text-sm font-medium sm:px-6 ${
                     index === 0 ? "border-[#79e043] bg-transparent text-[#79e043]" : "border-white/10 bg-[#1c221e] text-white"
                   }`}
                   key={filter}
@@ -977,7 +978,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
                   {filter}
                 </button>
               ))}
-              <button className="shrink-0 rounded-xl border border-white/10 bg-[#1c221e] px-5 py-2 text-white" type="button" aria-label="Mais filtros">
+              <button className="min-h-10 shrink-0 rounded-xl border border-white/10 bg-[#1c221e] px-5 py-2 text-white" type="button" aria-label="Mais filtros">
                 <ChevronIcon className="h-4 w-4" />
               </button>
             </div>
@@ -1028,7 +1029,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
                 >
                 <div className="flex min-w-0 gap-3">
                   <button
-                    className="relative h-20 w-28 flex-shrink-0 overflow-hidden rounded-xl text-left sm:w-32"
+                    className="relative h-20 w-24 flex-shrink-0 overflow-hidden rounded-xl text-left min-[390px]:w-28 sm:w-32"
                     onClick={(event) => {
                       event.stopPropagation();
                       setSelectedReplayId(String(replay.id));
@@ -1058,7 +1059,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
                   <button
                     className="flex min-w-0 items-center justify-center gap-2 rounded-lg bg-[#79e043] px-2 py-2 text-sm font-bold text-black"
                     onClick={(event) => {
@@ -1137,13 +1138,66 @@ function normalizeChatMessage(item) {
   };
 }
 
+function StreamingChatPanel({ chatDraft, chatListRef, chatMessages, handleSendChat, setChatDraft, className = "" }) {
+  return (
+    <section className={`flex min-h-[360px] min-w-0 flex-col sm:min-h-[420px] ${className}`} data-purpose="streaming-chat">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#8ddc00]/20 bg-[#101413]/75 backdrop-blur-xl">
+        <div className="flex items-center justify-between border-b border-[#8ddc00]/20 bg-[#272b29] p-4">
+          <h2 className="m-0 flex items-center gap-2 font-bold text-[#a1fb00]">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[#a1fb00]" />
+            Chat ao Vivo
+          </h2>
+          <span className="text-xs font-bold text-[#c0caad]">{chatMessages.length}</span>
+        </div>
+        <div className="flex-1 space-y-4 overflow-y-auto p-4" ref={chatListRef}>
+          {!chatMessages.length ? (
+            <div className="rounded-xl border border-[#414a34] bg-[#181c1b] p-4 text-sm text-[#c0caad]">
+              Seja o primeiro a comentar nessa live.
+            </div>
+          ) : null}
+
+          {chatMessages.map((item, index) => (
+            <div className="flex min-w-0 gap-3" key={item.id || `${item.user}-${index}`}>
+              <div className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full border border-[#8ddc00]/10 bg-[#363a38] text-xs">{item.initials}</div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span className="text-xs font-bold text-[#a1fb00]">{item.user}</span>
+                  {item.createdAt ? <span className="text-[10px] text-[#8a947a]">{formatDate(item.createdAt)}</span> : null}
+                </div>
+                <p className="m-0 break-words text-sm text-white">{item.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-[#8ddc00]/20 bg-[#1c201f] p-4">
+          <form className="space-y-2" onSubmit={handleSendChat}>
+            <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#8a947a]">admin</div>
+            <div className="flex items-center gap-2">
+              <input
+                className="min-w-0 flex-1 rounded-t-md border-0 border-b border-[#8ddc00]/30 bg-[#101413] px-3 py-2 text-sm text-white outline-none focus:border-[#a1fb00] focus:ring-0"
+                maxLength={240}
+                onChange={(event) => setChatDraft(event.target.value)}
+                placeholder="Diga algo..."
+                type="text"
+                value={chatDraft}
+              />
+              <button className="rounded-full p-2 text-[#a1fb00] transition hover:bg-[#a1fb00]/10 disabled:opacity-40" disabled={!chatDraft.trim()} type="submit" aria-label="Enviar mensagem">
+                <Send size={18} />
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function StreamingPage() {
   const videoRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const hlsRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const chatListRef = useRef(null);
-  const chatEndRef = useRef(null);
   const [cameras, setCameras] = useState([]);
   const [replays, setReplays] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -1152,9 +1206,9 @@ function StreamingPage() {
   const [webrtcStatus, setWebrtcStatus] = useState("idle");
   const [webrtcError, setWebrtcError] = useState("");
   const [webrtcConfigVersion, setWebrtcConfigVersion] = useState(0);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState(() => loadStoredChatMessages());
   const [chatDraft, setChatDraft] = useState("");
+  const [previewReplayId, setPreviewReplayId] = useState("");
 
   useEffect(() => {
     async function loadStreamingData() {
@@ -1211,6 +1265,7 @@ function StreamingPage() {
   const cameraReplays = selectedCamera
     ? replays.filter((replay) => replay.status === "ready" && replay.camera_id === selectedCamera.id && replay.video_url).slice(0, 6)
     : [];
+  const previewReplay = cameraReplays.find((replay) => String(replay.id) === previewReplayId) || null;
 
   useEffect(() => {
     if (!selectedCameraId) {
@@ -1241,16 +1296,7 @@ function StreamingPage() {
   }, [selectedCameraId]);
 
   const isLive = webrtcStatus === "connected" || webrtcStatus === "receiving";
-  const streamStatusLabel =
-    webrtcStatus === "connected" || webrtcStatus === "receiving"
-      ? "Ao vivo"
-      : webrtcStatus === "connecting"
-        ? "Conectando"
-        : webrtcStatus === "missing-url"
-          ? "Sem fonte"
-          : webrtcStatus === "error"
-            ? "Sem sinal"
-            : selectedCamera?.status || "Offline";
+  const streamStatusLabel = isLive ? "Ao vivo" : "Offline";
 
   const scheduleWebrtcReconnect = useCallback(() => {
     if (reconnectTimerRef.current) {
@@ -1480,36 +1526,25 @@ function StreamingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#101413] px-3 pb-10 pt-20 text-[#e0e3e0] sm:px-4 md:px-12">
-      <nav className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between gap-2 border-b border-[#8ddc00]/30 bg-[#101413]/80 px-3 shadow-[0_0_15px_rgba(141,220,0,0.1)] backdrop-blur-xl sm:px-4 md:px-12">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-          <button className="grid h-10 w-10 place-items-center rounded-full text-[#8ddc00] transition hover:bg-[#8ddc00]/10 active:scale-95" onClick={() => setDrawerOpen(true)} type="button" aria-label="Abrir menu">
-            <span className="text-2xl leading-none">=</span>
-          </button>
-          <a className="truncate text-lg font-black italic tracking-tight text-white no-underline sm:text-xl" href="/">
-            Sertao <span className="text-[#a1fb00]">Replay</span>
-          </a>
-        </div>
+    <main className="min-h-screen bg-[#101413] px-3 pb-10 pt-20 text-[#e0e3e0] sm:px-4 md:px-8 xl:px-12">
+      <nav className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between gap-3 border-b border-[#8ddc00]/30 bg-[#101413]/80 px-3 shadow-[0_0_15px_rgba(141,220,0,0.1)] backdrop-blur-xl sm:px-4 md:px-8 xl:px-12">
+        <a className="flex min-w-0 items-center no-underline transition hover:opacity-90" href="/" aria-label="Sertao Replay - inicio">
+          <img alt="Sertao Replay" className="h-10 w-auto max-w-[min(13rem,55vw)] object-contain sm:h-11" src="/assets/logo-sertao-replay-nav.png" />
+        </a>
 
-        <div className="hidden max-w-xl flex-1 px-8 md:block">
-          <div className="relative">
-            <input className="w-full rounded-t-lg border-0 border-b-2 border-[#8ddc00]/20 bg-[#181c1b] px-4 py-2 text-sm text-white outline-none transition focus:border-[#8ddc00] focus:ring-0" placeholder="Pesquisar partidas, atletas..." type="text" />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#a1fb00]">⌕</span>
-          </div>
-        </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <span className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] sm:px-3 sm:text-[11px] sm:tracking-[0.14em] ${isLive ? "bg-[#a1fb00] text-[#102000]" : "bg-[#272b29] text-[#c0caad]"}`}>
+          <span className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] sm:px-3 sm:text-[11px] sm:tracking-[0.14em] ${isLive ? "bg-[#a1fb00] text-[#102000]" : "bg-[#ff4d4d] text-white"}`}>
             {streamStatusLabel}
           </span>
-          <a className="rounded-full border border-[#8ddc00]/40 px-3 py-2 text-xs font-bold text-[#a1fb00] no-underline sm:px-4" href={selectedCamera ? cameraPathFromBackendId(selectedCamera.id) : "/"}>
+          <a className="inline-flex min-h-9 items-center rounded-full border border-[#8ddc00]/40 px-3 py-2 text-xs font-bold text-[#a1fb00] no-underline sm:px-4" href={selectedCamera ? cameraPathFromBackendId(selectedCamera.id) : "/"}>
             Camera
           </a>
         </div>
       </nav>
 
       <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-6 lg:grid-cols-12">
-        <section className="space-y-6 lg:col-span-8 xl:col-span-9">
+        <section className="min-w-0 lg:col-span-8 xl:col-span-9">
           <div className="relative aspect-video overflow-hidden rounded-xl border border-[#8ddc00]/20 bg-black shadow-[0_0_15px_rgba(141,220,0,0.3)]">
             <video
               ref={videoRef}
@@ -1522,9 +1557,9 @@ function StreamingPage() {
             />
 
             {!isLive ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0b0f0e]/80 p-8 text-center backdrop-blur-sm">
-                <Video size={48} className="mb-4 text-[#a1fb00]" />
-                <h1 className="mb-2 text-2xl font-black text-white">
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0b0f0e]/80 p-4 text-center backdrop-blur-sm sm:p-8">
+                <Video size={48} className="mb-3 text-[#a1fb00] sm:mb-4" />
+                <h1 className="mb-2 text-xl font-black text-white sm:text-2xl">
                   {webrtcStatus === "connecting" ? "Conectando live" : "Live indisponivel"}
                 </h1>
                 <p className="max-w-md text-sm text-[#c0caad]">
@@ -1534,12 +1569,23 @@ function StreamingPage() {
             ) : null}
 
           </div>
+        </section>
 
+        <StreamingChatPanel
+            chatDraft={chatDraft}
+            chatListRef={chatListRef}
+            chatMessages={chatMessages}
+            handleSendChat={handleSendChat}
+            setChatDraft={setChatDraft}
+          className="lg:sticky lg:top-24 lg:col-span-4 lg:row-span-3 lg:h-[calc(100vh-120px)] xl:col-span-3"
+        />
+
+        <section className="min-w-0 space-y-6 lg:col-span-8 xl:col-span-9">
           <section className="space-y-4">
             <h1 className="break-words text-2xl font-black tracking-tight text-white sm:text-3xl md:text-4xl">{selectedCamera?.name || "Streaming Sertao Replay"}</h1>
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
               <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                <div className="grid h-12 w-12 place-items-center rounded-full border-2 border-[#8ddc00] bg-[#1c201f] font-black italic text-[#a1fb00]">SR</div>
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border-2 border-[#8ddc00] bg-[#1c201f] font-black italic text-[#a1fb00]">SR</div>
                 <div className="min-w-0">
                   <p className="m-0 font-bold text-white">Sertao Replay</p>
                   <p className="m-0 break-words text-sm text-[#c0caad]">{message}</p>
@@ -1549,7 +1595,7 @@ function StreamingPage() {
               <div className="flex min-w-0 flex-wrap gap-2">
                 {cameras.map((camera) => (
                   <button
-                    className={`rounded-full border px-4 py-2 text-xs font-black uppercase transition ${
+                    className={`min-h-10 rounded-full border px-3 py-2 text-xs font-black uppercase transition sm:px-4 ${
                       camera.id === selectedCamera?.id ? "border-[#a1fb00] bg-[#a1fb00] text-[#102000]" : "border-[#414a34] bg-[#1c201f] text-[#c0caad] hover:border-[#a1fb00]"
                     }`}
                     key={camera.id}
@@ -1570,14 +1616,22 @@ function StreamingPage() {
             <h2 className="text-2xl font-black text-white">Highlights recentes</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {cameraReplays.map((replay) => (
-                <a className="group text-white no-underline" href={mediaUrl(replay.video_url)} key={replay.id} target="_blank" rel="noreferrer">
+                <button
+                  className="group min-h-0 rounded-xl border-0 bg-transparent p-0 text-left text-white transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#a1fb00]"
+                  key={replay.id}
+                  onClick={() => setPreviewReplayId(String(replay.id))}
+                  type="button"
+                >
                   <div className="relative mb-2 aspect-video overflow-hidden rounded-xl bg-[#0b0f0e]">
                     <img alt={replayTitle(replay)} className="h-full w-full object-cover opacity-70 transition duration-500 group-hover:scale-105" src={posterImage} />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition group-hover:opacity-100">
+                      <PlayCircleIcon className="h-12 w-12 text-white drop-shadow-[0_0_16px_rgba(0,0,0,0.8)]" />
+                    </div>
                     <span className="absolute bottom-2 right-2 rounded bg-black/80 px-2 py-1 text-xs text-white">{replayDurationLabel(replay.duration)}</span>
                   </div>
                   <h3 className="mb-1 line-clamp-2 font-bold transition group-hover:text-[#a1fb00]">{replayTitle(replay)}</h3>
                   <p className="m-0 text-sm text-[#c0caad]">{formatDate(replay.created_at)}</p>
-                </a>
+                </button>
               ))}
 
               {!cameraReplays.length ? (
@@ -1587,78 +1641,46 @@ function StreamingPage() {
           </section>
         </section>
 
-        <aside className="flex min-h-[420px] max-h-[70vh] flex-col lg:sticky lg:top-24 lg:col-span-4 lg:h-[calc(100vh-120px)] lg:max-h-none xl:col-span-3">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#8ddc00]/20 bg-[#101413]/75 backdrop-blur-xl">
-            <div className="flex items-center justify-between border-b border-[#8ddc00]/20 bg-[#272b29] p-4">
-              <h2 className="m-0 flex items-center gap-2 font-bold text-[#a1fb00]">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-[#a1fb00]" />
-                Chat ao Vivo
-              </h2>
-              <span className="text-xs font-bold text-[#c0caad]">{chatMessages.length}</span>
-            </div>
-            <div className="flex-1 space-y-4 overflow-y-auto p-4" ref={chatListRef}>
-              {!chatMessages.length ? (
-                <div className="rounded-xl border border-[#414a34] bg-[#181c1b] p-4 text-sm text-[#c0caad]">
-                  Seja o primeiro a comentar nessa live.
-                </div>
-              ) : null}
-
-              {chatMessages.map((item, index) => (
-                <div className="flex min-w-0 gap-3" key={item.id || `${item.user}-${index}`}>
-                  <div className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full border border-[#8ddc00]/10 bg-[#363a38] text-xs">{item.initials}</div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <span className="text-xs font-bold text-[#a1fb00]">{item.user}</span>
-                      {item.createdAt ? <span className="text-[10px] text-[#8a947a]">{formatDate(item.createdAt)}</span> : null}
-                    </div>
-                    <p className="m-0 break-words text-sm text-white">{item.text}</p>
-                  </div>
-                </div>
-              ))}
-
-              <div ref={chatEndRef} />
-            </div>
-            <div className="border-t border-[#8ddc00]/20 bg-[#1c201f] p-4">
-              <form className="space-y-2" onSubmit={handleSendChat}>
-                <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#8a947a]">admin</div>
-                <div className="flex items-center gap-2">
-                  <input
-                    className="min-w-0 flex-1 rounded-t-md border-0 border-b border-[#8ddc00]/30 bg-[#101413] px-3 py-2 text-sm text-white outline-none focus:border-[#a1fb00] focus:ring-0"
-                    maxLength={240}
-                    onChange={(event) => setChatDraft(event.target.value)}
-                    placeholder="Diga algo..."
-                    type="text"
-                    value={chatDraft}
-                  />
-                  <button className="rounded-full p-2 text-[#a1fb00] transition hover:bg-[#a1fb00]/10 disabled:opacity-40" disabled={!chatDraft.trim()} type="submit" aria-label="Enviar mensagem">
-                    <Send size={18} />
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </aside>
       </div>
 
-      {drawerOpen ? (
-        <div className="fixed inset-0 z-[60] bg-black/60" onClick={() => setDrawerOpen(false)}>
-          <aside className="h-full w-[min(20rem,calc(100vw-2rem))] border-r border-[#414a34] bg-[#272b29] px-5 py-6 shadow-2xl sm:px-6" onClick={(event) => event.stopPropagation()}>
-            <div className="mb-8 flex items-center gap-4">
-              <div className="grid h-12 w-12 place-items-center rounded-full border border-[#8ddc00]/50 bg-[#101413] font-black text-[#a1fb00]">SR</div>
-              <div>
-                <h3 className="m-0 font-bold text-white">Sertao Fan</h3>
-                <p className="m-0 text-xs text-[#c0caad]">Streaming ao vivo</p>
+      {previewReplay ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onClick={() => setPreviewReplayId("")}>
+          <section
+            className="w-full max-w-4xl overflow-hidden rounded-2xl border border-[#8ddc00]/30 bg-[#101413] shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Preview de ${replayTitle(previewReplay)}`}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[#8ddc00]/20 p-4">
+              <div className="min-w-0">
+                <p className="m-0 text-[10px] font-black uppercase tracking-[0.16em] text-[#a1fb00]">Preview</p>
+                <h2 className="m-0 line-clamp-2 text-lg font-black text-white sm:text-2xl">{replayTitle(previewReplay)}</h2>
+                <p className="m-0 text-sm text-[#c0caad]">{formatDate(previewReplay.created_at)}</p>
               </div>
+              <button
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#414a34] text-[#c0caad] transition hover:border-[#a1fb00] hover:text-[#a1fb00]"
+                onClick={() => setPreviewReplayId("")}
+                type="button"
+                aria-label="Fechar preview"
+              >
+                <X size={20} />
+              </button>
             </div>
-            <nav className="space-y-1">
-              <a className="flex items-center gap-4 border-l-4 border-[#a1fb00] bg-[#a1fb00]/10 px-4 py-3 text-[#a1fb00] no-underline" href="/streaming">All Sports</a>
-              <a className="flex items-center gap-4 px-4 py-3 text-[#c0caad] no-underline hover:bg-[#a1fb00]/5" href="/">Home</a>
-              <a className="flex items-center gap-4 px-4 py-3 text-[#c0caad] no-underline hover:bg-[#a1fb00]/5" href="/teste">Operador</a>
-              <a className="flex items-center gap-4 px-4 py-3 text-[#c0caad] no-underline hover:bg-[#a1fb00]/5" href="/admin">Admin</a>
-            </nav>
-          </aside>
+            <div className="aspect-video bg-black">
+              <video
+                className="h-full w-full object-contain"
+                controls
+                playsInline
+                poster={posterImage}
+                preload="metadata"
+                src={mediaUrl(previewReplay.video_url)}
+              />
+            </div>
+          </section>
         </div>
       ) : null}
+
     </main>
   );
 }
