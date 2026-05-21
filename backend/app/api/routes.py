@@ -27,6 +27,7 @@ logger = get_logger(__name__)
 camera_service = CameraService()
 replay_service = ReplayService()
 settings = get_settings()
+DEFAULT_WEBRTC_WHEP_URL_MAP = "campo-01=http://54.207.185.74:8889/camera1/whep"
 
 
 def require_operator(
@@ -74,10 +75,9 @@ def _safe_camera_file_id(camera_id: str) -> str:
 
 def _webrtc_url_map() -> dict[str, str]:
     url_map: dict[str, str] = {}
-    if not settings.webrtc_whep_url_map:
-        return url_map
+    raw_map = settings.webrtc_whep_url_map or DEFAULT_WEBRTC_WHEP_URL_MAP
 
-    for item in re.split(r"[,\n;]+", settings.webrtc_whep_url_map):
+    for item in re.split(r"[,\n;]+", raw_map):
         if "=" not in item:
             continue
 
