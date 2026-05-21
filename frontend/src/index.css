@@ -22,6 +22,19 @@ body {
   background: #050505;
 }
 
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img,
+video,
+svg {
+  max-width: 100%;
+}
+
 button,
 video,
 a {
@@ -631,5 +644,44 @@ textarea {
 
   .operator-topbar {
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-shell,
+  .operator-shell {
+    width: min(100% - 20px, 620px);
+  }
+
+  .operator-topbar {
+    flex-direction: column;
+  }
+
+  .operator-nav,
+  .replay-meta {
+    width: 100%;
+  }
+
+  .operator-nav > *,
+  .replay-meta span,
+  .download-link {
+    min-width: 0;
+  }
+
+  .status-pill {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .operator-panel {
+    padding: 16px;
+  }
+
+  .camera-row {
+    grid-template-columns: 1fr;
+  }
+
+  .camera-row .status-pill {
+    width: fit-content;
   }
 }

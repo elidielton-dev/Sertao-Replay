@@ -551,7 +551,7 @@ function FieldMonitorIcon() {
 function CameraCard({ camera, fieldId }) {
   return (
     <a
-      className="group relative grid min-h-[150px] grid-cols-[160px_minmax(0,1fr)] gap-4 rounded-[8px] border border-white/5 bg-[#181c1b]/60 p-3 text-left text-white no-underline transition hover:border-[#a4ff00]/60 hover:bg-[#181c1b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#a4ff00]"
+      className="group relative grid min-h-[150px] grid-cols-1 gap-4 rounded-[8px] border border-white/5 bg-[#181c1b]/60 p-3 text-left text-white no-underline transition hover:border-[#a4ff00]/60 hover:bg-[#181c1b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#a4ff00] sm:grid-cols-[160px_minmax(0,1fr)]"
       href={cameraRoute(fieldId, camera.id)}
       aria-label={`Abrir ${camera.name} do Campo ${fieldId}`}
     >
@@ -566,9 +566,9 @@ function CameraCard({ camera, fieldId }) {
           <div className="rounded border border-gray-700 p-1 text-gray-400">
             <CameraGlyph className="h-4 w-4" />
           </div>
-          <span className="font-bold">{camera.name}</span>
+          <span className="min-w-0 break-words font-bold">{camera.name}</span>
         </div>
-        <span className="text-sm text-gray-400">{camera.position}</span>
+        <span className="break-words text-sm text-gray-400">{camera.position}</span>
         <div className="mt-1 flex items-center gap-2">
           <StatusDot />
           <span className="text-[10px] font-semibold uppercase text-[#a4ff00]">Online</span>
@@ -859,7 +859,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
   }, [cameraReplays, selectedReplayId]);
 
   return (
-    <main className="min-h-screen bg-[#0a0f0d] pb-36 text-white">
+    <main className="min-h-screen bg-[#0a0f0d] pb-28 text-white lg:pb-10">
       <header className="sticky top-0 z-50 flex items-center justify-between bg-[#0a0f0d]/95 px-4 py-4 backdrop-blur-md lg:px-8" data-purpose="main-header">
         <a className="flex items-center" href="/" aria-label="Voltar para a Home">
           <img alt="Sertao Replay" className="h-10 w-auto object-contain lg:h-12" src="/assets/logo-sertao-replay-nav.png" />
@@ -873,8 +873,8 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
               <div className="rounded-lg border border-[#79e043]/30 bg-[#1c221e] p-2 text-[#79e043]">
                 <CameraGlyph className="h-5 w-5" />
               </div>
-              <div>
-                <h1 className="mb-0 flex flex-wrap items-center gap-2 text-2xl font-bold lg:text-4xl">
+              <div className="min-w-0">
+                <h1 className="mb-0 flex flex-wrap items-center gap-2 break-words text-xl font-bold sm:text-2xl lg:text-4xl">
                   {field ? `Campo ${field.number}` : "Campo"} <span className="text-3xl leading-none text-[#79e043]">•</span>{" "}
                   <span className="text-[#79e043]">{camera?.name || "Camera"}</span>
                 </h1>
@@ -919,13 +919,13 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
               </div>
 
               {selectedReplay ? (
-                <div className="absolute right-4 top-14 max-w-[min(360px,calc(100%-2rem))] rounded-xl bg-black/55 p-3 text-right backdrop-blur-sm">
+                <div className="absolute right-3 top-3 max-w-[min(250px,calc(100%-1.5rem))] rounded-xl bg-black/55 p-2 text-right backdrop-blur-sm sm:right-4 sm:top-14 sm:max-w-[min(360px,calc(100%-2rem))] sm:p-3">
                   <div>
                     <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#79e043]">Assistindo agora</p>
-                    <h2 className="m-0 text-base font-black text-white lg:text-xl">{replayTitle(selectedReplay)}</h2>
+                    <h2 className="m-0 line-clamp-2 text-sm font-black text-white sm:text-base lg:text-xl">{replayTitle(selectedReplay)}</h2>
                     <p className="m-0 text-xs text-[#a0a0a0]">{formatDate(selectedReplay.created_at)}</p>
                   </div>
-                  <a className="mt-3 inline-flex rounded-lg bg-[#79e043] px-4 py-2 text-xs font-black uppercase text-black no-underline" href={selectedDownloadUrl} download>
+                  <a className="mt-2 hidden rounded-lg bg-[#79e043] px-3 py-2 text-xs font-black uppercase text-black no-underline sm:inline-flex sm:px-4" href={selectedDownloadUrl} download>
                     Baixar replay
                   </a>
                 </div>
@@ -977,7 +977,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
                   {filter}
                 </button>
               ))}
-              <button className="rounded-xl border border-white/10 bg-[#1c221e] px-5 py-2 text-white" type="button" aria-label="Mais filtros">
+              <button className="shrink-0 rounded-xl border border-white/10 bg-[#1c221e] px-5 py-2 text-white" type="button" aria-label="Mais filtros">
                 <ChevronIcon className="h-4 w-4" />
               </button>
             </div>
@@ -1026,9 +1026,9 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
                   role="button"
                   tabIndex={0}
                 >
-                <div className="flex gap-3">
+                <div className="flex min-w-0 gap-3">
                   <button
-                    className="relative h-20 w-32 flex-shrink-0 overflow-hidden rounded-xl text-left"
+                    className="relative h-20 w-28 flex-shrink-0 overflow-hidden rounded-xl text-left sm:w-32"
                     onClick={(event) => {
                       event.stopPropagation();
                       setSelectedReplayId(String(replay.id));
@@ -1044,12 +1044,12 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
                     {isSelected ? <span className="absolute left-1 top-1 rounded bg-[#79e043] px-2 py-0.5 text-[9px] font-black uppercase text-black">No player</span> : null}
                   </button>
 
-                  <div className="flex flex-1 flex-col justify-between py-1">
+                  <div className="flex min-w-0 flex-1 flex-col justify-between py-1">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="min-w-0">
                         <p className="mb-1 text-[10px] text-[#79e043]">{formatDate(replay.created_at)}</p>
-                        <h3 className="mb-0 text-sm font-bold">{replayTitle(replay)}</h3>
-                        <p className="mb-0 mt-1 text-[11px] text-[#a0a0a0]">{replay.camera_name || camera.name}</p>
+                        <h3 className="mb-0 line-clamp-2 text-sm font-bold">{replayTitle(replay)}</h3>
+                        <p className="mb-0 mt-1 truncate text-[11px] text-[#a0a0a0]">{replay.camera_name || camera.name}</p>
                       </div>
                       <button className="text-[#a0a0a0]" type="button" aria-label="Mais opcoes">
                         <span className="text-xl leading-none">...</span>
@@ -1060,7 +1060,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
 
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    className="flex items-center justify-center gap-2 rounded-lg bg-[#79e043] py-2 text-sm font-bold text-black"
+                    className="flex min-w-0 items-center justify-center gap-2 rounded-lg bg-[#79e043] px-2 py-2 text-sm font-bold text-black"
                     onClick={(event) => {
                       event.stopPropagation();
                       setSelectedReplayId(String(replay.id));
@@ -1070,13 +1070,13 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
                     <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M8 5v14l11-7z" />
                     </svg>
-                    Ver no player
+                    <span className="truncate">Ver no player</span>
                   </button>
-                  <a className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-[#1c221e] py-2 text-sm text-white no-underline" href={downloadUrl} download onClick={(event) => event.stopPropagation()}>
+                  <a className="flex min-w-0 items-center justify-center gap-2 rounded-lg border border-white/10 bg-[#1c221e] px-2 py-2 text-sm text-white no-underline" href={downloadUrl} download onClick={(event) => event.stopPropagation()}>
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
                     </svg>
-                    Baixar
+                    <span className="truncate">Baixar</span>
                   </a>
                 </div>
                 </article>
@@ -1087,7 +1087,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
         </aside>
       </div>
 
-      <footer className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-[#0a0f0d] via-[#0a0f0d] to-transparent p-4 pt-10" data-purpose="navigation-footer">
+      <footer className="mx-auto mt-6 w-full max-w-md px-4 pb-6 lg:hidden" data-purpose="navigation-footer">
         <div className="mx-auto max-w-md space-y-3">
           <a className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[#79e043] py-4 font-extrabold text-black no-underline shadow-[0_0_20px_rgba(121,224,67,0.3)] transition active:scale-95" href={field ? field.href : "/"}>
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -1142,6 +1142,7 @@ function StreamingPage() {
   const peerConnectionRef = useRef(null);
   const hlsRef = useRef(null);
   const reconnectTimerRef = useRef(null);
+  const chatListRef = useRef(null);
   const chatEndRef = useRef(null);
   const [cameras, setCameras] = useState([]);
   const [replays, setReplays] = useState([]);
@@ -1164,7 +1165,7 @@ function StreamingPage() {
         setReplays(Array.isArray(replayData) ? replayData : []);
         setSelectedCameraId((current) => current || enabledCameras.find((camera) => camera.status === "recording")?.id || enabledCameras[0]?.id || "");
         setStatus("ready");
-        setMessage("Live pronta para conectar via WebRTC.");
+        setMessage("Live conectada pelo servidor publico.");
       } catch (error) {
         setStatus("error");
         setMessage(error.message);
@@ -1185,7 +1186,10 @@ function StreamingPage() {
   }, [chatMessages]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ block: "end" });
+    const chatList = chatListRef.current;
+    if (chatList) {
+      chatList.scrollTop = chatList.scrollHeight;
+    }
   }, [chatMessages.length]);
 
   useEffect(() => {
@@ -1243,7 +1247,7 @@ function StreamingPage() {
       : webrtcStatus === "connecting"
         ? "Conectando"
         : webrtcStatus === "missing-url"
-          ? "Configurar WebRTC"
+          ? "Sem fonte"
           : webrtcStatus === "error"
             ? "Sem sinal"
             : selectedCamera?.status || "Offline";
@@ -1476,13 +1480,13 @@ function StreamingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#101413] px-4 pb-10 pt-20 text-[#e0e3e0] md:px-12">
-      <nav className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-[#8ddc00]/30 bg-[#101413]/80 px-4 shadow-[0_0_15px_rgba(141,220,0,0.1)] backdrop-blur-xl md:px-12">
-        <div className="flex items-center gap-4">
+    <main className="min-h-screen bg-[#101413] px-3 pb-10 pt-20 text-[#e0e3e0] sm:px-4 md:px-12">
+      <nav className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between gap-2 border-b border-[#8ddc00]/30 bg-[#101413]/80 px-3 shadow-[0_0_15px_rgba(141,220,0,0.1)] backdrop-blur-xl sm:px-4 md:px-12">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
           <button className="grid h-10 w-10 place-items-center rounded-full text-[#8ddc00] transition hover:bg-[#8ddc00]/10 active:scale-95" onClick={() => setDrawerOpen(true)} type="button" aria-label="Abrir menu">
             <span className="text-2xl leading-none">=</span>
           </button>
-          <a className="text-xl font-black italic tracking-tight text-white no-underline" href="/">
+          <a className="truncate text-lg font-black italic tracking-tight text-white no-underline sm:text-xl" href="/">
             Sertao <span className="text-[#a1fb00]">Replay</span>
           </a>
         </div>
@@ -1494,11 +1498,11 @@ function StreamingPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${isLive ? "bg-[#a1fb00] text-[#102000]" : "bg-[#272b29] text-[#c0caad]"}`}>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <span className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] sm:px-3 sm:text-[11px] sm:tracking-[0.14em] ${isLive ? "bg-[#a1fb00] text-[#102000]" : "bg-[#272b29] text-[#c0caad]"}`}>
             {streamStatusLabel}
           </span>
-          <a className="rounded-full border border-[#8ddc00]/40 px-4 py-2 text-xs font-bold text-[#a1fb00] no-underline" href={selectedCamera ? cameraPathFromBackendId(selectedCamera.id) : "/"}>
+          <a className="rounded-full border border-[#8ddc00]/40 px-3 py-2 text-xs font-bold text-[#a1fb00] no-underline sm:px-4" href={selectedCamera ? cameraPathFromBackendId(selectedCamera.id) : "/"}>
             Camera
           </a>
         </div>
@@ -1532,17 +1536,17 @@ function StreamingPage() {
           </div>
 
           <section className="space-y-4">
-            <h1 className="text-3xl font-black tracking-tight text-white md:text-4xl">{selectedCamera?.name || "Streaming Sertao Replay"}</h1>
+            <h1 className="break-words text-2xl font-black tracking-tight text-white sm:text-3xl md:text-4xl">{selectedCamera?.name || "Streaming Sertao Replay"}</h1>
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-              <div className="flex items-center gap-4">
+              <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                 <div className="grid h-12 w-12 place-items-center rounded-full border-2 border-[#8ddc00] bg-[#1c201f] font-black italic text-[#a1fb00]">SR</div>
-                <div>
+                <div className="min-w-0">
                   <p className="m-0 font-bold text-white">Sertao Replay</p>
-                  <p className="m-0 text-sm text-[#c0caad]">{message}</p>
+                  <p className="m-0 break-words text-sm text-[#c0caad]">{message}</p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex min-w-0 flex-wrap gap-2">
                 {cameras.map((camera) => (
                   <button
                     className={`rounded-full border px-4 py-2 text-xs font-black uppercase transition ${
@@ -1583,7 +1587,7 @@ function StreamingPage() {
           </section>
         </section>
 
-        <aside className="flex h-[calc(100vh-120px)] flex-col lg:sticky lg:top-24 lg:col-span-4 xl:col-span-3">
+        <aside className="flex min-h-[420px] max-h-[70vh] flex-col lg:sticky lg:top-24 lg:col-span-4 lg:h-[calc(100vh-120px)] lg:max-h-none xl:col-span-3">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#8ddc00]/20 bg-[#101413]/75 backdrop-blur-xl">
             <div className="flex items-center justify-between border-b border-[#8ddc00]/20 bg-[#272b29] p-4">
               <h2 className="m-0 flex items-center gap-2 font-bold text-[#a1fb00]">
@@ -1592,7 +1596,7 @@ function StreamingPage() {
               </h2>
               <span className="text-xs font-bold text-[#c0caad]">{chatMessages.length}</span>
             </div>
-            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+            <div className="flex-1 space-y-4 overflow-y-auto p-4" ref={chatListRef}>
               {!chatMessages.length ? (
                 <div className="rounded-xl border border-[#414a34] bg-[#181c1b] p-4 text-sm text-[#c0caad]">
                   Seja o primeiro a comentar nessa live.
@@ -1600,14 +1604,14 @@ function StreamingPage() {
               ) : null}
 
               {chatMessages.map((item, index) => (
-                <div className="flex gap-3" key={item.id || `${item.user}-${index}`}>
+                <div className="flex min-w-0 gap-3" key={item.id || `${item.user}-${index}`}>
                   <div className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full border border-[#8ddc00]/10 bg-[#363a38] text-xs">{item.initials}</div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-baseline gap-2">
                       <span className="text-xs font-bold text-[#a1fb00]">{item.user}</span>
                       {item.createdAt ? <span className="text-[10px] text-[#8a947a]">{formatDate(item.createdAt)}</span> : null}
                     </div>
-                    <p className="m-0 text-sm text-white">{item.text}</p>
+                    <p className="m-0 break-words text-sm text-white">{item.text}</p>
                   </div>
                 </div>
               ))}
@@ -1638,7 +1642,7 @@ function StreamingPage() {
 
       {drawerOpen ? (
         <div className="fixed inset-0 z-[60] bg-black/60" onClick={() => setDrawerOpen(false)}>
-          <aside className="h-full w-80 border-r border-[#414a34] bg-[#272b29] px-6 py-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+          <aside className="h-full w-[min(20rem,calc(100vw-2rem))] border-r border-[#414a34] bg-[#272b29] px-5 py-6 shadow-2xl sm:px-6" onClick={(event) => event.stopPropagation()}>
             <div className="mb-8 flex items-center gap-4">
               <div className="grid h-12 w-12 place-items-center rounded-full border border-[#8ddc00]/50 bg-[#101413] font-black text-[#a1fb00]">SR</div>
               <div>
