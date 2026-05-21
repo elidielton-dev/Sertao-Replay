@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     default_replay_seconds: int = 15
     webrtc_whep_base_url: str | None = None
     webrtc_whep_url_map: str | None = "campo-01=http://187.19.251.46:8889/campo-01-live/whep"
+    hls_url_map: str | None = "campo-01=http://54.207.185.74:8888/camera1/index.m3u8"
 
     model_config = SettingsConfigDict(
         env_file=".env",

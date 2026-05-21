@@ -13,6 +13,7 @@ import {
   Settings,
   Video,
 } from "lucide-react";
+import Hls from "hls.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const DEFAULT_API_BASE =
@@ -26,6 +27,9 @@ const DEFAULT_WEBRTC_BASE =
     : "";
 const WEBRTC_BASE = (import.meta.env.VITE_WEBRTC_BASE_URL || DEFAULT_WEBRTC_BASE).replace(/\/$/, "");
 const WEBRTC_URL_STORAGE_PREFIX = "sertao_webrtc_url_";
+const DEFAULT_HLS_CAMERA_MAP = {
+  "campo-01": `${API_BASE}/cameras/campo-01/hls/index.m3u8`,
+};
 const OPERATOR_TOKEN_KEY = "sertao_operator_token";
 const REPLAY_HOTKEY_SECONDS = {
   F13: 15,
@@ -719,6 +723,18 @@ function webrtcUrlForCamera(camera) {
   return `${API_BASE}/cameras/${encodeURIComponent(camera.id)}/webrtc/offer`;
 }
 
+function hlsUrlForCamera(camera) {
+  if (!camera?.id) {
+    return "";
+  }
+
+  if (camera.hls_url || camera.hlsUrl) {
+    return camera.hls_url || camera.hlsUrl;
+  }
+
+  return DEFAULT_HLS_CAMERA_MAP[camera.id] || `${API_BASE}/cameras/${encodeURIComponent(camera.id)}/hls/index.m3u8`;
+}
+
 function waitForIceGatheringComplete(peerConnection) {
   if (peerConnection.iceGatheringState === "complete") {
     return Promise.resolve();
@@ -750,12 +766,17 @@ function waitForIceGatheringComplete(peerConnection) {
 }
 
 function clearVideoStream(video) {
-  if (!video?.srcObject) {
+  if (!video) {
     return;
   }
 
-  video.srcObject.getTracks?.().forEach((track) => track.stop());
-  video.srcObject = null;
+  if (video.srcObject) {
+    video.srcObject.getTracks?.().forEach((track) => track.stop());
+    video.srcObject = null;
+  }
+
+  video.removeAttribute("src");
+  video.load?.();
 }
 
 function IconButton({ children, className = "", ...props }) {
@@ -1119,6 +1140,7 @@ function normalizeChatMessage(item) {
 function StreamingPage() {
   const videoRef = useRef(null);
   const peerConnectionRef = useRef(null);
+  const hlsRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const chatEndRef = useRef(null);
   const [cameras, setCameras] = useState([]);
@@ -1181,6 +1203,7 @@ function StreamingPage() {
   const selectedCameraIdentity = selectedCamera ? parseCameraIdentity(selectedCamera) : null;
   const posterImage = cameraTemplate(selectedCameraIdentity?.cameraId || 1).image;
   const effectiveWebrtcUrl = selectedCamera ? webrtcUrlForCamera(selectedCamera) : "";
+  const effectiveHlsUrl = selectedCamera ? hlsUrlForCamera(selectedCamera) : "";
   const cameraReplays = selectedCamera
     ? replays.filter((replay) => replay.status === "ready" && replay.camera_id === selectedCamera.id && replay.video_url).slice(0, 6)
     : [];
@@ -1242,6 +1265,8 @@ function StreamingPage() {
       window.clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
     }
+    hlsRef.current?.destroy();
+    hlsRef.current = null;
 
     if (!selectedCamera?.id) {
       setWebrtcStatus("idle");
@@ -1250,21 +1275,69 @@ function StreamingPage() {
       return undefined;
     }
 
-    if (!effectiveWebrtcUrl) {
-      setWebrtcStatus("missing-url");
+    let cancelled = false;
+
+    function connectHls(reason = "") {
+      if (!effectiveHlsUrl || !video) {
+        setWebrtcStatus(reason ? "error" : "missing-url");
+        setWebrtcError(reason || "");
+        clearVideoStream(video);
+        return undefined;
+      }
+
+      setWebrtcStatus("connecting");
       setWebrtcError("");
       clearVideoStream(video);
-      return undefined;
+
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = effectiveHlsUrl;
+        video.play().catch(() => {});
+        setWebrtcStatus("receiving");
+        return undefined;
+      }
+
+      if (!Hls.isSupported()) {
+        setWebrtcStatus("error");
+        setWebrtcError(reason || "Este navegador nao tem suporte a live HLS.");
+        return undefined;
+      }
+
+      const hls = new Hls({
+        lowLatencyMode: true,
+        backBufferLength: 30,
+      });
+      hlsRef.current = hls;
+      hls.loadSource(effectiveHlsUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (!cancelled) {
+          video.play().catch(() => {});
+          setWebrtcStatus("receiving");
+        }
+      });
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (!cancelled && data?.fatal) {
+          setWebrtcStatus("error");
+          setWebrtcError("A live HLS ainda nao esta recebendo video do servidor publico.");
+          scheduleWebrtcReconnect();
+        }
+      });
+
+      return hls;
     }
 
-    if (typeof window === "undefined" || !window.RTCPeerConnection) {
-      setWebrtcStatus("error");
-      setWebrtcError("Este navegador nao tem suporte a WebRTC.");
-      clearVideoStream(video);
-      return undefined;
+    if (!effectiveWebrtcUrl || typeof window === "undefined" || !window.RTCPeerConnection) {
+      const hls = connectHls(!effectiveWebrtcUrl ? "" : "Este navegador nao tem suporte a WebRTC.");
+      return () => {
+        cancelled = true;
+        hls?.destroy?.();
+        if (hlsRef.current === hls) {
+          hlsRef.current = null;
+        }
+        clearVideoStream(video);
+      };
     }
 
-    let cancelled = false;
     const peerConnection = new window.RTCPeerConnection({
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
@@ -1337,10 +1410,9 @@ function StreamingPage() {
         await peerConnection.setRemoteDescription({ type: "answer", sdp: answer });
       } catch (error) {
         if (!cancelled) {
-          setWebrtcStatus("error");
-          setWebrtcError(error.message || "Nao foi possivel abrir a live por WebRTC.");
-          clearVideoStream(video);
-          scheduleWebrtcReconnect();
+          peerConnection.close();
+          peerConnectionRef.current = null;
+          connectHls(error.message || "Nao foi possivel abrir a live por WebRTC.");
         }
       }
     }
@@ -1352,10 +1424,12 @@ function StreamingPage() {
       if (peerConnectionRef.current === peerConnection) {
         peerConnectionRef.current = null;
       }
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
       peerConnection.close();
       clearVideoStream(video);
     };
-  }, [effectiveWebrtcUrl, scheduleWebrtcReconnect, selectedCamera?.id, webrtcConfigVersion]);
+  }, [effectiveHlsUrl, effectiveWebrtcUrl, scheduleWebrtcReconnect, selectedCamera?.id, webrtcConfigVersion]);
 
   async function handleSendChat(event) {
     event.preventDefault();

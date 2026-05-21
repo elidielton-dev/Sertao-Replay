@@ -30,6 +30,7 @@ camera_service = CameraService()
 replay_service = ReplayService()
 settings = get_settings()
 DEFAULT_WEBRTC_WHEP_URL_MAP = "campo-01=http://187.19.251.46:8889/campo-01-live/whep"
+DEFAULT_HLS_URL_MAP = "campo-01=http://54.207.185.74:8888/camera1/index.m3u8"
 
 
 class ChatMessageCreate(BaseModel):
@@ -115,6 +116,32 @@ def _webrtc_url_map() -> dict[str, str]:
     return url_map
 
 
+def _parse_url_map(raw_map: str | None, default_map: str) -> dict[str, str]:
+    url_map: dict[str, str] = {}
+    for item in re.split(r"[,\n;]+", raw_map or default_map):
+        if "=" not in item:
+            continue
+
+        camera_id, url = item.split("=", 1)
+        camera_id = camera_id.strip()
+        url = url.strip()
+        if camera_id and url:
+            url_map[camera_id] = url
+
+    return url_map
+
+
+def _hls_url_for_camera(camera_id: str, asset_path: str = "index.m3u8") -> str | None:
+    url_map = _parse_url_map(settings.hls_url_map, DEFAULT_HLS_URL_MAP)
+    base_url = url_map.get(camera_id)
+    if not base_url:
+        return None
+
+    parsed = urllib.parse.urlsplit(base_url)
+    base_dir = base_url if base_url.endswith("/") else base_url.rsplit("/", 1)[0] + "/"
+    return urllib.parse.urljoin(base_dir, asset_path)
+
+
 def _webrtc_offer_url(camera_id: str) -> str | None:
     url_map = _webrtc_url_map()
     if camera_id in url_map:
@@ -142,9 +169,62 @@ def _post_webrtc_offer(offer_url: str, offer_sdp: bytes) -> bytes:
         return response.read()
 
 
+def _fetch_hls_asset(url: str) -> tuple[bytes, str]:
+    request = urllib.request.Request(url, headers={"User-Agent": "SertaoReplay/1.0"})
+    with urllib.request.urlopen(request, timeout=15) as response:
+        content_type = response.headers.get_content_type() or "application/octet-stream"
+        return response.read(), content_type
+
+
 @router.get("/health")
 def health():
     return {"ok": True, "message": "Sertao Replay API online"}
+
+
+@router.get("/cameras/{camera_id}/hls/{asset_path:path}")
+async def proxy_camera_hls(camera_id: str, asset_path: str = "index.m3u8"):
+    safe_asset_path = (asset_path or "index.m3u8").strip()
+    if (
+        not safe_asset_path
+        or safe_asset_path.startswith("/")
+        or ".." in safe_asset_path.split("/")
+        or "://" in safe_asset_path
+    ):
+        raise HTTPException(status_code=400, detail="Arquivo HLS invalido.")
+
+    asset_url = _hls_url_for_camera(camera_id, safe_asset_path)
+    if not asset_url:
+        raise HTTPException(status_code=404, detail="HLS nao configurado para esta camera.")
+
+    try:
+        content, content_type = await run_in_threadpool(_fetch_hls_asset, asset_url)
+    except urllib.error.HTTPError as exc:
+        raise HTTPException(status_code=exc.code, detail="Arquivo HLS nao encontrado.") from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise HTTPException(status_code=502, detail="Servidor HLS indisponivel.") from exc
+
+    if safe_asset_path.endswith(".m3u8"):
+        text = content.decode("utf-8", errors="replace")
+        proxied_lines = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                proxied_lines.append(line)
+                continue
+
+            proxied_lines.append(f"/api/cameras/{urllib.parse.quote(camera_id, safe='')}/hls/{stripped}")
+
+        content = ("\n".join(proxied_lines) + "\n").encode("utf-8")
+        content_type = "application/vnd.apple.mpegurl"
+
+    return Response(
+        content,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
 
 
 @router.get("/chat/messages")
