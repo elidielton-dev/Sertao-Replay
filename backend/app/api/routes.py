@@ -182,7 +182,7 @@ def health():
 
 
 @router.get("/cameras/{camera_id}/hls/{asset_path:path}")
-async def proxy_camera_hls(camera_id: str, asset_path: str = "index.m3u8"):
+async def proxy_camera_hls(request: Request, camera_id: str, asset_path: str = "index.m3u8"):
     safe_asset_path = (asset_path or "index.m3u8").strip()
     if (
         not safe_asset_path
@@ -195,6 +195,8 @@ async def proxy_camera_hls(camera_id: str, asset_path: str = "index.m3u8"):
     asset_url = _hls_url_for_camera(camera_id, safe_asset_path)
     if not asset_url:
         raise HTTPException(status_code=404, detail="HLS nao configurado para esta camera.")
+    if request.url.query:
+        asset_url = f"{asset_url}?{request.url.query}"
 
     try:
         content, content_type = await run_in_threadpool(_fetch_hls_asset, asset_url)
