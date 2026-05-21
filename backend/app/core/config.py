@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     log_root: str = "./storage/logs"
     default_replay_seconds: int = 15
     webrtc_whep_base_url: str | None = None
-    webrtc_whep_url_map: str | None = None
+    webrtc_whep_url_map: str | None = "campo-01=http://54.207.185.74:8889/camera1/whep"
 
     model_config = SettingsConfigDict(
         env_file=".env",
