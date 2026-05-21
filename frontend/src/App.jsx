@@ -1326,6 +1326,18 @@ function StreamingPage() {
       return hls;
     }
 
+    if (effectiveHlsUrl && !WEBRTC_BASE) {
+      const hls = connectHls();
+      return () => {
+        cancelled = true;
+        hls?.destroy?.();
+        if (hlsRef.current === hls) {
+          hlsRef.current = null;
+        }
+        clearVideoStream(video);
+      };
+    }
+
     if (!effectiveWebrtcUrl || typeof window === "undefined" || !window.RTCPeerConnection) {
       const hls = connectHls(!effectiveWebrtcUrl ? "" : "Este navegador nao tem suporte a WebRTC.");
       return () => {
