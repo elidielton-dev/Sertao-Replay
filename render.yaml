@@ -16,6 +16,10 @@ services:
           property: connectionString
       - key: OPERATOR_TOKEN
         generateValue: true
+      - key: WEBRTC_WHEP_BASE_URL
+        sync: false
+      - key: WEBRTC_WHEP_URL_MAP
+        sync: false
 
 databases:
   - name: sports-replay-db
