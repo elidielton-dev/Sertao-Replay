@@ -1429,14 +1429,22 @@ function loadStoredChatUser() {
     return "";
   }
 
-  return window.localStorage.getItem(STREAM_CHAT_USER_KEY) || "";
+  const storedUser = (window.localStorage.getItem(STREAM_CHAT_USER_KEY) || "").trim();
+  if (!storedUser || storedUser.toLowerCase() === "admin") {
+    window.localStorage.removeItem(STREAM_CHAT_USER_KEY);
+    return "";
+  }
+
+  return storedUser;
 }
 
 function normalizeChatMessage(item) {
+  const storedUser = String(item.user || "").trim();
+  const safeUser = storedUser.toLowerCase() === "admin" ? STREAM_CHAT_USER : storedUser || STREAM_CHAT_USER;
   return {
     id: item.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    user: item.user || STREAM_CHAT_USER,
-    initials: item.initials || chatInitials(item.user || STREAM_CHAT_USER),
+    user: safeUser,
+    initials: chatInitials(safeUser),
     text: item.text || "",
     createdAt: item.createdAt || item.created_at || new Date().toISOString(),
   };
@@ -1480,7 +1488,9 @@ function StreamingChatPanel({ chatDraft, chatListRef, chatMessages, handleSendCh
         </div>
         <div className="border-t border-[#8ddc00]/20 bg-[#1c201f] p-4">
           <form className="space-y-2" onSubmit={handleSendChat}>
-            <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#8a947a]">admin</div>
+            <button className="text-left text-xs font-bold uppercase tracking-[0.14em] text-[#8a947a]" onClick={onChangeUser} type="button">
+              {userName || STREAM_CHAT_USER}
+            </button>
             <div className="flex items-center gap-2">
               <input
                 className="min-w-0 flex-1 rounded-t-md border-0 border-b border-[#8ddc00]/30 bg-[#101413] px-3 py-2 text-sm text-white outline-none focus:border-[#a1fb00] focus:ring-0"
@@ -2794,6 +2804,7 @@ function SuperAdminPage() {
   });
   const [cep, setCep] = useState("");
   const [cepStatus, setCepStatus] = useState("");
+  const [copyNotice, setCopyNotice] = useState("");
   const [message, setMessage] = useState("Entre para carregar os clientes.");
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
@@ -2838,16 +2849,17 @@ function SuperAdminPage() {
   async function copyInstallKey(value) {
     if (!value) {
       setMessage("Chave de instalacao indisponivel.");
+      setCopyNotice("");
       return;
     }
 
     try {
       await navigator.clipboard.writeText(value);
       setMessage("Chave de instalacao copiada.");
-      window.alert("Chave de instalacao copiada.");
+      setCopyNotice("Chave do instalador copiada.");
     } catch {
       setMessage(`Chave de instalacao: ${value}`);
-      window.alert(`Chave de instalacao: ${value}`);
+      setCopyNotice(`Copie manualmente a chave: ${value}`);
     }
   }
 
@@ -2862,16 +2874,17 @@ function SuperAdminPage() {
   async function copyClientPassword(value) {
     if (!value) {
       setMessage("Senha indisponivel. Defina uma nova senha para exibir e copiar.");
+      setCopyNotice("");
       return;
     }
 
     try {
       await navigator.clipboard.writeText(value);
       setMessage("Senha do cliente copiada.");
-      window.alert("Senha do cliente copiada.");
+      setCopyNotice("Senha do cliente copiada.");
     } catch {
       setMessage(`Senha do cliente: ${value}`);
-      window.alert(`Senha do cliente: ${value}`);
+      setCopyNotice(`Copie manualmente a senha: ${value}`);
     }
   }
 
@@ -3005,6 +3018,7 @@ function SuperAdminPage() {
     try {
       const data = await apiRequest(`/super-admin/clients/${encodeURIComponent(clientId)}`, superAdminOptions());
       setSelectedClient(data);
+      setCopyNotice("");
       setMessage(`Cliente ${data.name} selecionado.`);
     } catch (error) {
       setMessage(error.message);
@@ -3316,11 +3330,12 @@ function SuperAdminPage() {
                     <p><b>Usuario</b><strong>{selectedAdmin?.email || "Usuario nao cadastrado"}</strong></p>
                     <p><b>Senha</b><strong>{selectedPassword || "Senha nao exibida"}</strong></p>
                     <button type="button" onClick={() => copyClientPassword(selectedPassword)}>
-                      <KeyRound size={17} /> Copiar senha
+                      <KeyRound size={17} /> {copyNotice.includes("Senha") ? "Senha copiada" : "Copiar senha"}
                     </button>
                     <button type="button" onClick={() => resetClientPassword(selectedClient)}>
                       <RotateCcw size={17} /> Definir nova senha
                     </button>
+                    {copyNotice.includes("Senha") ? <div className="super-admin-copy-notice">{copyNotice}</div> : null}
                     {!selectedPassword ? <small>Senhas antigas nao podem ser recuperadas porque o login guarda hash. Defina uma nova senha para ela aparecer aqui.</small> : null}
                   </div>
                   <div className="super-admin-install-card">
@@ -3328,8 +3343,9 @@ function SuperAdminPage() {
                     <strong>{selectedClient.install_key || "Gerando chave..."}</strong>
                     <small>Use esta chave no instalador da maquina do cliente para vincular o servidor local a esta empresa.</small>
                     <button type="button" onClick={() => copyInstallKey(selectedClient.install_key)}>
-                      <KeyRound size={17} /> Copiar chave
+                      <KeyRound size={17} /> {copyNotice.includes("Chave") ? "Chave copiada" : "Copiar chave"}
                     </button>
+                    {copyNotice.includes("Chave") ? <div className="super-admin-copy-notice">{copyNotice}</div> : null}
                   </div>
                   <div className="super-admin-info-list">
                     <p><span>Empresa</span><b>{selectedClient.company_email || "Email nao informado"}</b></p>
