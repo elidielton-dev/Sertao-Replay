@@ -3260,9 +3260,14 @@ function AdminPage() {
 export default function App() {
   const path = window.location.pathname;
   const tenantAdminMatch = path.match(/^\/admin\/([^/]+)(?:\/(dashboard))?\/?$/);
+
+  if (path.startsWith("/super-admin")) {
+    return <SuperAdminPage />;
+  }
+
   const tenantAliasMatch = path.match(/^\/a\/([^/]+)(?:\/(.*))?$/);
   const reservedRootMatch = path.match(/^\/([^/]+)(?:\/(.*))?$/);
-  const reservedRoots = new Set(["admin", "api", "assets", "camera", "streaming", "teste", "highlights", "highlight", "higliyhet", "torneio", "tournaments", "tournament", "favicon.ico"]);
+  const reservedRoots = new Set(["admin", "api", "assets", "camera", "super-admin", "streaming", "teste", "highlights", "highlight", "higliyhet", "torneio", "tournaments", "tournament", "favicon.ico"]);
   const directClientMatch =
     reservedRootMatch && !reservedRoots.has(reservedRootMatch[1].toLowerCase()) && !/^campo\d+$/i.test(reservedRootMatch[1])
       ? reservedRootMatch
@@ -3310,10 +3315,6 @@ export default function App() {
   const tenantMatch = window.location.pathname.match(/^\/a\/([^/]+)\/?$/);
   const cameraRouteMatch = window.location.pathname.match(/^\/campo(\d+)\/camera(\d+)\/?$/);
   const fieldMatch = window.location.pathname.match(/^\/campo(\d+)\/?$/);
-
-  if (window.location.pathname.startsWith("/super-admin")) {
-    return <SuperAdminPage />;
-  }
 
   if (
     tenantAdminMatch
