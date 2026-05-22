@@ -420,6 +420,12 @@ def public_client_replay(slug: str, replay_id: int, db: Session = Depends(get_db
     return replay
 
 
+@router.post("/public/clients/{slug}/replay-requests")
+def create_public_client_replay_request(slug: str, payload: ReplayRequest, db: Session = Depends(get_db)):
+    client = get_client_by_slug(db, slug)
+    return _create_replay_request_for_client(payload, db, client.id)
+
+
 @router.post("/super-admin/login")
 def login_super_admin(payload: SuperAdminLoginRequest):
     if settings.app_env != "production" and not settings.operator_token:
@@ -454,7 +460,7 @@ def resolve_install_key(payload: InstallResolveRequest, db: Session = Depends(ge
             "operator_token": settings.operator_token,
             "client_id": client.id,
             "client_slug": client.slug,
-            "camera_id": "campo-01",
+            "camera_id": f"{client.slug}-campo-01"[:64],
             "operator_url": f"https://sports-replay-mvp.vercel.app/{client.slug}",
         },
     }
@@ -942,7 +948,10 @@ def create_replay_request(
     payload: ReplayRequest,
     db: Session = Depends(get_db),
 ):
-    client_id = _default_client_id()
+    return _create_replay_request_for_client(payload, db, _default_client_id())
+
+
+def _create_replay_request_for_client(payload: ReplayRequest, db: Session, client_id: str):
     try:
         camera = camera_service.get_camera(db, payload.camera_id, client_id=client_id)
     except ValueError as exc:

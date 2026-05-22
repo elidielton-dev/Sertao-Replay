@@ -2014,10 +2014,10 @@ function OperatorPage() {
     setMessage(`Solicitacao de ${seconds}s enviada. Aguardando capture-server cortar e subir o MP4...`);
 
     try {
-      const data = await apiRequest("/replay-requests", {
+      const data = await apiRequest(clientSlug ? clientApiPath(clientSlug, "/replay-requests") : "/replay-requests", {
         method: "POST",
         body: JSON.stringify({
-          camera_id: cameraId,
+          camera_id: camera?.backendId || cameraId,
           seconds,
           label: label.trim() || null,
         }),

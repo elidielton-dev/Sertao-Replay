@@ -27,7 +27,7 @@ def load_dotenv() -> None:
         if not clean or clean.startswith("#") or "=" not in clean:
             continue
         key, value = clean.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        os.environ.setdefault(key.strip().lstrip("\ufeff"), value.strip().strip('"').strip("'"))
 
 
 def redact(value: str | None) -> str:

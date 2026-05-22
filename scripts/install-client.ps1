@@ -101,7 +101,7 @@ $envLines = @(
   "SNAPSHOT_INTERVAL_SECONDS=2"
 )
 
-Set-Content -LiteralPath $envPath -Value $envLines -Encoding UTF8
+[System.IO.File]::WriteAllLines($envPath, $envLines, [System.Text.UTF8Encoding]::new($false))
 
 Write-Host ""
 Write-Host ".env criado em: $envPath"
