@@ -1980,6 +1980,13 @@ h1 {
   gap: 12px;
 }
 
+.tenant-admin-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+  gap: 12px;
+  align-items: end;
+}
+
 .tenant-admin-form label {
   color: #c0caad;
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
@@ -2164,7 +2171,8 @@ h1 {
 
   .tenant-admin-heading,
   .tenant-admin-main-grid,
-  .tenant-admin-camera-admin {
+  .tenant-admin-camera-admin,
+  .tenant-admin-form-grid {
     grid-template-columns: 1fr;
   }
 

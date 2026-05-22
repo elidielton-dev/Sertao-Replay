@@ -2496,6 +2496,13 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
     name: "",
     camera_ip: "",
   });
+  const [fieldForm, setFieldForm] = useState({
+    field_number: "1",
+    field_name: "Campo 1",
+    camera_number: "1",
+    camera_name: "Camera 1",
+    camera_ip: "",
+  });
 
   const token = session?.access_token;
   const client = settingsData || session?.client;
@@ -2553,8 +2560,22 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
     setCameraForm((current) => ({ ...current, [field]: value }));
   }
 
+  function updateFieldForm(field, value) {
+    setFieldForm((current) => ({ ...current, [field]: value }));
+  }
+
   function resetCameraForm() {
     setCameraForm({ id: "", name: "", camera_ip: "" });
+  }
+
+  function resetFieldForm() {
+    setFieldForm({
+      field_number: "1",
+      field_name: "Campo 1",
+      camera_number: "1",
+      camera_name: "Camera 1",
+      camera_ip: "",
+    });
   }
 
   function editTenantCamera(camera) {
@@ -2605,6 +2626,43 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
       });
       setMessage(`Camera ${saved.name} salva no cliente ${client?.name || session?.client?.name || ""}.`);
       resetCameraForm();
+      await reloadAdminData();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveTenantFieldCamera(event) {
+    event.preventDefault();
+    if (!token) {
+      setMessage("Login admin obrigatorio.");
+      return;
+    }
+
+    const fieldNumberValue = Math.max(1, Number.parseInt(fieldForm.field_number, 10) || 1);
+    const cameraNumberValue = Math.max(1, Number.parseInt(fieldForm.camera_number, 10) || 1);
+    const fieldId = String(fieldNumberValue).padStart(2, "0");
+    const cameraId = String(cameraNumberValue).padStart(2, "0");
+    const fieldName = fieldForm.field_name.trim() || `Campo ${fieldNumberValue}`;
+    const cameraName = fieldForm.camera_name.trim() || `Camera ${cameraNumberValue}`;
+    const payload = {
+      id: `campo-${fieldId}-camera-${cameraId}`,
+      name: `${fieldName} - ${cameraName}`,
+      camera_ip: fieldForm.camera_ip.trim(),
+    };
+
+    setBusy(true);
+    setMessage(`Criando ${fieldName} com ${cameraName}...`);
+    try {
+      const saved = await apiRequest("/admin/cameras", {
+        method: "POST",
+        bearerToken: token,
+        body: JSON.stringify(payload),
+      });
+      setMessage(`${fieldName} criado com a camera ${saved.name}.`);
+      resetFieldForm();
       await reloadAdminData();
     } catch (error) {
       setMessage(error.message);
@@ -2768,6 +2826,69 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
 
         {view === "dashboard" ? (
           <section className="tenant-admin-camera-admin">
+            <article className="tenant-admin-card tenant-admin-form-card" id="criar-campo">
+              <div className="tenant-admin-section-head">
+                <div>
+                  <h2>Criar campo</h2>
+                  <p>Crie o campo e vincule a primeira camera em um passo.</p>
+                </div>
+              </div>
+              <form className="tenant-admin-form" onSubmit={saveTenantFieldCamera}>
+                <div className="tenant-admin-form-grid">
+                  <label htmlFor="tenantFieldNumber">Numero do campo</label>
+                  <input
+                    id="tenantFieldNumber"
+                    min="1"
+                    type="number"
+                    value={fieldForm.field_number}
+                    onChange={(event) => updateFieldForm("field_number", event.target.value)}
+                    required
+                  />
+
+                  <label htmlFor="tenantFieldName">Nome do campo</label>
+                  <input
+                    id="tenantFieldName"
+                    value={fieldForm.field_name}
+                    onChange={(event) => updateFieldForm("field_name", event.target.value)}
+                    placeholder="Campo 1"
+                    required
+                  />
+
+                  <label htmlFor="tenantFieldCameraNumber">Numero da camera</label>
+                  <input
+                    id="tenantFieldCameraNumber"
+                    min="1"
+                    type="number"
+                    value={fieldForm.camera_number}
+                    onChange={(event) => updateFieldForm("camera_number", event.target.value)}
+                    required
+                  />
+
+                  <label htmlFor="tenantFieldCameraName">Nome da camera</label>
+                  <input
+                    id="tenantFieldCameraName"
+                    value={fieldForm.camera_name}
+                    onChange={(event) => updateFieldForm("camera_name", event.target.value)}
+                    placeholder="Camera 1"
+                    required
+                  />
+                </div>
+
+                <label htmlFor="tenantFieldCameraIp">IP ou RTSP da camera</label>
+                <input
+                  id="tenantFieldCameraIp"
+                  value={fieldForm.camera_ip}
+                  onChange={(event) => updateFieldForm("camera_ip", event.target.value)}
+                  placeholder="10.0.0.142:8554 ou rtsp://10.0.0.142:8554/ronaldinho-demo"
+                  required
+                />
+
+                <div className="tenant-admin-form-actions">
+                  <button className="tenant-admin-primary" type="submit" disabled={busy}>{busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />} Criar campo</button>
+                </div>
+              </form>
+            </article>
+
             <article className="tenant-admin-card tenant-admin-form-card">
               <div className="tenant-admin-section-head">
                 <div>

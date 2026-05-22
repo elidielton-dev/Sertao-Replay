@@ -92,6 +92,48 @@ function Ensure-Ffmpeg {
   throw "FFmpeg nao foi encontrado depois da instalacao. Feche e abra o PowerShell, ou instale FFmpeg manualmente."
 }
 
+function Get-FfprobePath([string]$FfmpegPath) {
+  $command = Get-Command ffprobe -ErrorAction SilentlyContinue
+  if ($command) {
+    return $command.Source
+  }
+
+  $nearFfmpeg = Join-Path (Split-Path -Parent $FfmpegPath) "ffprobe.exe"
+  if (Test-Path -LiteralPath $nearFfmpeg) {
+    return $nearFfmpeg
+  }
+
+  return ""
+}
+
+function Open-FirewallPort([int]$Port) {
+  try {
+    $ruleName = "Sertao Replay Fake Camera RTSP $Port"
+    $existing = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
+    if (!$existing) {
+      New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow -Protocol TCP -LocalPort $Port | Out-Null
+    }
+    Write-Ok "Firewall liberado para TCP $Port."
+  } catch {
+    Write-Warn "Nao consegui abrir o firewall automaticamente. Se outro computador for acessar, libere TCP $Port no Windows Firewall."
+  }
+}
+
+function Test-RtspUrl([string]$FfprobePath, [string]$Url) {
+  if (!$FfprobePath) {
+    Write-Warn "ffprobe nao encontrado; nao vou validar a URL $Url."
+    return
+  }
+
+  $result = & $FfprobePath -v error -rtsp_transport tcp -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 $Url 2>&1
+  if ($LASTEXITCODE -eq 0 -and $result) {
+    Write-Ok "RTSP validado: $Url"
+    return
+  }
+
+  Write-Warn "Nao consegui validar $Url. Se estiver em outro computador, confirme IP e firewall."
+}
+
 function Ensure-MediaMtx {
   if (Test-Path -LiteralPath $mediamtxExe) {
     return $mediamtxExe
@@ -146,6 +188,7 @@ if (!(Test-Path -LiteralPath $VideoPath)) {
 Write-Step "Preparando camera fake"
 Stop-PreviousFakeCamera
 $ffmpegExe = Ensure-Ffmpeg
+$ffprobeExe = Get-FfprobePath $ffmpegExe
 $mediamtxExe = Ensure-MediaMtx
 
 @"
@@ -178,6 +221,7 @@ if ($listener) {
     throw "MediaMTX nao iniciou. Veja os logs em $logDir."
   }
 }
+Open-FirewallPort $RtspPort
 
 $localRtspUrl = "rtsp://127.0.0.1:$RtspPort/$RtspPath"
 $networkRtspUrl = "rtsp://$MachineIp`:$RtspPort/$RtspPath"
@@ -193,6 +237,11 @@ $ffmpeg = Start-Process -FilePath $ffmpegExe `
 Start-Sleep -Seconds 4
 if ($ffmpeg.HasExited) {
   throw "FFmpeg encerrou ao publicar o video. Veja os logs em $logDir."
+}
+
+Test-RtspUrl $ffprobeExe $localRtspUrl
+if ($MachineIp -ne "127.0.0.1") {
+  Test-RtspUrl $ffprobeExe $networkRtspUrl
 }
 
 @{
