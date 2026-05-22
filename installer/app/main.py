@@ -8,6 +8,7 @@ import sys
 import threading
 import time
 import webbrowser
+import ctypes
 from pathlib import Path
 from tkinter import StringVar, messagebox
 
@@ -38,6 +39,26 @@ DANGER = "#ffb4ab"
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("green")
+
+
+def is_admin() -> bool:
+    try:
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
+
+
+def relaunch_as_admin() -> bool:
+    if is_admin() or os.environ.get("SERTAO_REPLAY_HOME"):
+        return True
+    if getattr(sys, "frozen", False):
+        executable = sys.executable
+        params = " ".join(f'"{arg}"' for arg in sys.argv[1:])
+    else:
+        executable = sys.executable
+        params = " ".join([f'"{Path(__file__).resolve()}"', *[f'"{arg}"' for arg in sys.argv[1:]]])
+    result = ctypes.windll.shell32.ShellExecuteW(None, "runas", executable, params, None, 1)
+    return result > 32
 
 
 def resource_path(relative: str) -> Path:
@@ -132,15 +153,21 @@ def write_env(resolved: dict, camera: dict) -> None:
 
 
 def copy_self() -> None:
-    INSTALL_DIR.mkdir(parents=True, exist_ok=True)
-    CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        INSTALL_DIR.mkdir(parents=True, exist_ok=True)
+        CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+    except PermissionError as exc:
+        raise RuntimeError("Acesso negado ao criar C:\\SertaoReplay. Abra o instalador como administrador.") from exc
     current = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve()
-    if getattr(sys, "frozen", False) and current != APP_EXE:
-        shutil.copy2(current, APP_EXE)
-    elif not APP_EXE.exists():
-        launcher = INSTALL_DIR / "SertaoReplay-dev.bat"
-        launcher.write_text(f'@echo off\npython "{Path(__file__).resolve()}" %*\n', encoding="ascii")
+    try:
+        if getattr(sys, "frozen", False) and current != APP_EXE:
+            shutil.copy2(current, APP_EXE)
+        elif not APP_EXE.exists():
+            launcher = INSTALL_DIR / "SertaoReplay-dev.bat"
+            launcher.write_text(f'@echo off\npython "{Path(__file__).resolve()}" %*\n', encoding="ascii")
+    except PermissionError as exc:
+        raise RuntimeError("Acesso negado ao copiar o servidor para C:\\SertaoReplay. Abra o instalador como administrador.") from exc
 
 
 def create_task() -> None:
@@ -411,6 +438,11 @@ class FinalWindow(StepWindow):
 def main() -> None:
     if "--capture" in sys.argv:
         run_capture_mode()
+        return
+    if not relaunch_as_admin():
+        messagebox.showerror("Permissao necessaria", "Para instalar em C:\\SertaoReplay, confirme a permissao de administrador do Windows.")
+        return
+    if not is_admin() and not os.environ.get("SERTAO_REPLAY_HOME"):
         return
     if read_state():
         FinalWindow().mainloop()
