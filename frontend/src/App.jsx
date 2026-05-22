@@ -51,6 +51,7 @@ const DEFAULT_HLS_CAMERA_MAP = {
 };
 const OPERATOR_TOKEN_KEY = "sertao_operator_token";
 const SUPER_ADMIN_SESSION_KEY = "sertao_super_admin_session";
+const SUPER_ADMIN_CLIENT_CREDENTIALS_KEY = "sertao_super_admin_client_credentials";
 const ADMIN_SESSION_KEY = "sertao_admin_session";
 const REPLAY_HOTKEY_SECONDS = {
   F13: 10,
@@ -59,6 +60,24 @@ const REPLAY_HOTKEY_SECONDS = {
   F16: 15,
 };
 const NEXT_CAMERA_HOTKEY = "F17";
+
+function generateClientPassword() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  let password = "SR-";
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const values = new Uint32Array(12);
+    crypto.getRandomValues(values);
+    values.forEach((value) => {
+      password += chars[value % chars.length];
+    });
+    return password;
+  }
+
+  for (let index = 0; index < 12; index += 1) {
+    password += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return password;
+}
 
 function formatDate(value) {
   if (!value) {
@@ -2713,7 +2732,13 @@ function SuperAdminPage() {
   const [clients, setClients] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [selectedClient, setSelectedClient] = useState(null);
-  const [clientCredentials, setClientCredentials] = useState({});
+  const [clientCredentials, setClientCredentials] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(SUPER_ADMIN_CLIENT_CREDENTIALS_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  });
   const [message, setMessage] = useState("Entre para carregar os clientes.");
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
@@ -2766,6 +2791,28 @@ function SuperAdminPage() {
       setMessage("Chave de instalacao copiada.");
     } catch {
       setMessage(`Chave de instalacao: ${value}`);
+    }
+  }
+
+  function saveClientCredentials(updater) {
+    setClientCredentials((current) => {
+      const next = typeof updater === "function" ? updater(current) : updater;
+      localStorage.setItem(SUPER_ADMIN_CLIENT_CREDENTIALS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  async function copyClientPassword(value) {
+    if (!value) {
+      setMessage("Senha indisponivel. Defina uma nova senha para exibir e copiar.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value);
+      setMessage("Senha do cliente copiada.");
+    } catch {
+      setMessage(`Senha do cliente: ${value}`);
     }
   }
 
@@ -2890,7 +2937,7 @@ function SuperAdminPage() {
         method: "POST",
         body: JSON.stringify(payload),
       }));
-      setClientCredentials((current) => ({ ...current, [saved.id]: payload.admin_password }));
+      saveClientCredentials((current) => ({ ...current, [saved.id]: payload.admin_password }));
       resetForm();
       setMessage(`Cliente ${saved.name} criado. Usuario: ${payload.admin_email} | Senha: ${payload.admin_password}`);
       await loadClients(saved.id);
@@ -2917,6 +2964,41 @@ function SuperAdminPage() {
     }
   }
 
+  async function resetClientPassword(client) {
+    const generatedPassword = generateClientPassword();
+    const nextPassword = window.prompt(
+      `Nova senha para ${client.name}. Confirme ou altere a senha abaixo:`,
+      generatedPassword,
+    );
+    if (!nextPassword) {
+      return;
+    }
+    if (nextPassword.length < 6) {
+      setMessage("A senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const admin = client.users?.[0] || {};
+      const saved = await apiRequest(`/super-admin/clients/${encodeURIComponent(client.id)}`, superAdminOptions({
+        method: "PATCH",
+        body: JSON.stringify({
+          admin_name: admin.name || client.name,
+          admin_email: admin.email,
+          admin_password: nextPassword,
+        }),
+      }));
+      saveClientCredentials((current) => ({ ...current, [saved.id]: nextPassword }));
+      setMessage(`Senha atualizada. Usuario: ${admin.email || "admin"} | Senha: ${nextPassword}`);
+      await loadClients(saved.id);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function deleteClient(client) {
     if (!window.confirm(`Excluir o cliente ${client.name}? Esta acao remove usuarios, cameras, replays e logs dele.`)) {
       return;
@@ -2925,6 +3007,11 @@ function SuperAdminPage() {
     setBusy(true);
     try {
       await apiRequest(`/super-admin/clients/${encodeURIComponent(client.id)}?force=true`, superAdminOptions({ method: "DELETE" }));
+      saveClientCredentials((current) => {
+        const next = { ...current };
+        delete next[client.id];
+        return next;
+      });
       setMessage(`Cliente ${client.name} excluido.`);
       await loadClients("");
     } catch (error) {
@@ -3121,7 +3208,13 @@ function SuperAdminPage() {
                     <span>Login do cliente</span>
                     <p><b>Usuario</b><strong>{selectedAdmin?.email || "Usuario nao cadastrado"}</strong></p>
                     <p><b>Senha</b><strong>{selectedPassword || "Senha nao exibida"}</strong></p>
-                    {!selectedPassword ? <small>Por seguranca, senhas antigas nao ficam visiveis. Ao criar um novo cliente, a senha aparece aqui nesta sessao.</small> : null}
+                    <button type="button" onClick={() => copyClientPassword(selectedPassword)}>
+                      <KeyRound size={17} /> Copiar senha
+                    </button>
+                    <button type="button" onClick={() => resetClientPassword(selectedClient)}>
+                      <RotateCcw size={17} /> Definir nova senha
+                    </button>
+                    {!selectedPassword ? <small>Senhas antigas nao podem ser recuperadas porque o login guarda hash. Defina uma nova senha para ela aparecer aqui.</small> : null}
                   </div>
                   <div className="super-admin-install-card">
                     <span>Chave do instalador</span>
