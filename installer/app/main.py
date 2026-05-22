@@ -17,14 +17,15 @@ from PIL import Image
 import requests
 
 
-API_URL = "https://sertao-replay.onrender.com/api"
+API_URL = os.environ.get("SERTAO_REPLAY_API_URL", "https://sertao-replay.onrender.com/api").rstrip("/")
 INSTALL_DIR = Path(os.environ.get("SERTAO_REPLAY_HOME", r"C:\SertaoReplay"))
 APP_EXE = INSTALL_DIR / "SertaoReplay.exe"
 CAPTURE_DIR = INSTALL_DIR / "capture-server"
 ENV_PATH = CAPTURE_DIR / ".env"
 STATE_PATH = INSTALL_DIR / "install_state.json"
 LOG_DIR = INSTALL_DIR / "logs"
-TASK_NAME = "Sertao Replay Capture"
+TASK_NAME = os.environ.get("SERTAO_REPLAY_TASK_NAME", "Sertao Replay Capture")
+STARTUP_NAME = os.environ.get("SERTAO_REPLAY_STARTUP_NAME", "SertaoReplayCapture")
 
 BG = "#070b0d"
 SURFACE = "#101413"
@@ -179,17 +180,31 @@ def create_task() -> None:
         return
     fallback = subprocess.run(base, capture_output=True, text=True)
     if fallback.returncode != 0:
-        raise RuntimeError((fallback.stderr or elevated.stderr or "Falha ao criar tarefa agendada.").strip())
+        create_startup_launcher(command)
+
+
+def startup_launcher_path() -> Path:
+    startup_dir = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+    return startup_dir / f"{STARTUP_NAME}.bat"
+
+
+def create_startup_launcher(command: str) -> None:
+    path = startup_launcher_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"@echo off\nstart \"\" {command}\n", encoding="ascii")
 
 
 def delete_task() -> None:
     subprocess.run(["schtasks", "/Delete", "/TN", TASK_NAME, "/F"], capture_output=True, text=True)
+    startup_launcher_path().unlink(missing_ok=True)
 
 
 def start_capture() -> None:
     executable = APP_EXE if APP_EXE.exists() else Path(sys.executable)
     args = [str(executable), "--capture"] if APP_EXE.exists() else [str(executable), str(Path(__file__).resolve()), "--capture"]
-    subprocess.Popen(args, cwd=str(INSTALL_DIR), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_file = (LOG_DIR / "capture-launch.log").open("ab")
+    subprocess.Popen(args, cwd=str(INSTALL_DIR), stdout=log_file, stderr=log_file)
 
 
 def stop_capture_processes() -> None:

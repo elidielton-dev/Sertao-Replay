@@ -7,6 +7,11 @@ $logo = Join-Path $root "frontend\public\assets\logo-sertao-replay-nav.png"
 $icon = Join-Path $PSScriptRoot "assets\sertao-replay.ico"
 
 python -m pip install pyinstaller customtkinter requests
+if ($LASTEXITCODE -ne 0) {
+  throw "Falha ao instalar dependencias do instalador."
+}
+
+Get-Process SertaoReplaySetup -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
 python -m PyInstaller `
   --noconfirm `
@@ -21,6 +26,9 @@ python -m PyInstaller `
   --add-data "$logo;." `
   --add-data "$icon;." `
   "$app"
+if ($LASTEXITCODE -ne 0) {
+  throw "Falha ao gerar o executavel do instalador."
+}
 
 Write-Host ""
 Write-Host "Executavel gerado em:"

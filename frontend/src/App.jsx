@@ -53,11 +53,12 @@ const OPERATOR_TOKEN_KEY = "sertao_operator_token";
 const SUPER_ADMIN_SESSION_KEY = "sertao_super_admin_session";
 const ADMIN_SESSION_KEY = "sertao_admin_session";
 const REPLAY_HOTKEY_SECONDS = {
-  F13: 15,
+  F13: 10,
   F14: 15,
-  F15: 15,
+  F15: 30,
   F16: 15,
 };
+const NEXT_CAMERA_HOTKEY = "F17";
 
 function formatDate(value) {
   if (!value) {
@@ -167,7 +168,7 @@ function cameraPathFromBackendId(cameraId, clientSlug = "") {
     return cameraRoute(Number(match[1]), Number(match[2] || 1), clientSlug);
   }
 
-  return clientPath(clientSlug, "/teste");
+  return clientPath(clientSlug, "/operador");
 }
 
 function fieldNumber(value) {
@@ -352,12 +353,17 @@ function PlayCircleIcon({ className = "h-5 w-5" }) {
   );
 }
 
+function AppLogoIcon({ className = "h-12 w-12", imageClassName = "h-[72%] w-[72%]" }) {
+  return (
+    <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black ${className}`} aria-hidden="true">
+      <img alt="" className={`${imageClassName} object-contain`} src="/icon-192.png" />
+    </span>
+  );
+}
+
 function LogoMark() {
   return (
-    <div className="relative flex h-12 w-12 items-center justify-center lg:h-16 lg:w-16" aria-hidden="true">
-      <div className="absolute inset-0 rounded-full border border-neon-green/40 bg-neon-green/10 neon-border-glow" />
-      <PlayCircleIcon className="relative h-8 w-8 text-neon-green neon-glow lg:h-11 lg:w-11" />
-    </div>
+    <AppLogoIcon className="h-12 w-12 rounded-xl ring-1 ring-neon-green/30 lg:h-16 lg:w-16" />
   );
 }
 
@@ -1061,7 +1067,7 @@ function IconButton({ children, className = "", ...props }) {
 
 function resolveOperatorCameraId(apiCameras) {
   const params = new URLSearchParams(window.location.search);
-  const routeMatch = window.location.pathname.match(/^\/teste\/campo(\d+)(?:\/camera(\d+))?\/?$/);
+  const routeMatch = window.location.pathname.match(/^\/operador\/campo(\d+)(?:\/camera(\d+))?\/?$/);
   const fieldId = routeMatch?.[1] || params.get("campo");
   const cameraId = routeMatch?.[2] || params.get("camera");
 
@@ -1975,6 +1981,20 @@ function OperatorPage() {
     setCameraId((current) => current || resolveOperatorCameraId(Array.isArray(data) ? data : []));
   }
 
+  function selectNextCamera() {
+    setCameraId((current) => {
+      if (!cameras.length) {
+        return current;
+      }
+
+      const currentIndex = cameras.findIndex((camera) => camera.id === current);
+      const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % cameras.length : 0;
+      const nextCamera = cameras[nextIndex];
+      setMessage(`Camera selecionada: ${nextCamera.name}`);
+      return nextCamera.id;
+    });
+  }
+
   async function loadReplays() {
     const data = await apiRequest("/replays");
     setReplays(Array.isArray(data) ? data : []);
@@ -2014,10 +2034,10 @@ function OperatorPage() {
     setMessage(`Solicitacao de ${seconds}s enviada. Aguardando capture-server cortar e subir o MP4...`);
 
     try {
-      const data = await apiRequest(clientSlug ? clientApiPath(clientSlug, "/replay-requests") : "/replay-requests", {
+      const data = await apiRequest("/replay-requests", {
         method: "POST",
         body: JSON.stringify({
-          camera_id: camera?.backendId || cameraId,
+          camera_id: cameraId,
           seconds,
           label: label.trim() || null,
         }),
@@ -2034,6 +2054,12 @@ function OperatorPage() {
 
   useEffect(() => {
     function handleReplayHotkey(event) {
+      if (event.key === NEXT_CAMERA_HOTKEY && !event.repeat) {
+        event.preventDefault();
+        selectNextCamera();
+        return;
+      }
+
       const seconds = REPLAY_HOTKEY_SECONDS[event.key];
       if (!seconds || event.repeat) {
         return;
@@ -2045,7 +2071,7 @@ function OperatorPage() {
 
     window.addEventListener("keydown", handleReplayHotkey);
     return () => window.removeEventListener("keydown", handleReplayHotkey);
-  }, [requestReplay]);
+  }, [cameras, requestReplay]);
 
   const selectedCamera = cameras.find((camera) => camera.id === cameraId);
   const readyReplays = replays.filter((replay) => replay.status === "ready" && replay.video_url).slice(0, 5);
@@ -3281,9 +3307,9 @@ function AdminPage() {
             <Home size={18} />
             Home
           </a>
-          <a className="operator-brand" href="/teste">
+          <a className="operator-brand" href="/operador">
             <Video size={18} />
-            Teste
+            Operador
           </a>
         </nav>
         <span className={`status-pill status-${apiStatus}`}>
@@ -3466,6 +3492,69 @@ function AdminPage() {
   );
 }
 
+function RouteUnavailablePage({ slug, message = "Cliente nao encontrado ou desativado." }) {
+  return (
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center bg-dark-bg px-5 text-white sm:max-w-2xl lg:max-w-5xl">
+      <div className="glass-card rounded-2xl p-6 sm:p-8">
+        <AppLogoIcon className="mb-5 h-14 w-14 rounded-xl ring-1 ring-neon-green/30" />
+        <p className="eyebrow">Rota indisponivel</p>
+        <h1 className="mb-3 text-2xl font-black uppercase leading-tight sm:text-4xl">Cliente sem rota ativa</h1>
+        <p className="mb-5 text-sm text-gray-300 sm:text-base">
+          {message} {slug ? `Slug: /${slug}` : ""}
+        </p>
+        <a className="inline-flex min-h-11 items-center rounded-lg bg-neon-green px-4 py-2 text-sm font-black uppercase text-black no-underline" href="/">
+          Voltar para o inicio
+        </a>
+      </div>
+    </main>
+  );
+}
+
+function ClientRouteGate({ slug, children }) {
+  const [status, setStatus] = useState("checking");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setStatus("checking");
+    setMessage("");
+
+    apiRequest(`/public/clients/${encodeURIComponent(slug)}`)
+      .then(() => {
+        if (active) {
+          setStatus("active");
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setStatus("unavailable");
+          setMessage(error.message);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
+  if (status === "checking") {
+    return (
+      <main className="mx-auto flex min-h-screen w-full max-w-md items-center justify-center bg-dark-bg px-5 text-white sm:max-w-2xl lg:max-w-5xl">
+        <div className="glass-card flex items-center gap-3 rounded-2xl p-5 text-sm font-bold text-gray-200">
+          <Loader2 className="spin text-neon-green" size={20} />
+          Validando cliente...
+        </div>
+      </main>
+    );
+  }
+
+  if (status !== "active") {
+    return <RouteUnavailablePage slug={slug} message={message} />;
+  }
+
+  return children;
+}
+
 export default function App() {
   const path = window.location.pathname;
   const tenantAdminMatch = path.match(/^\/admin\/([^/]+)(?:\/(dashboard))?\/?$/);
@@ -3476,7 +3565,7 @@ export default function App() {
 
   const tenantAliasMatch = path.match(/^\/a\/([^/]+)(?:\/(.*))?$/);
   const reservedRootMatch = path.match(/^\/([^/]+)(?:\/(.*))?$/);
-  const reservedRoots = new Set(["admin", "api", "assets", "camera", "super-admin", "streaming", "teste", "highlights", "highlight", "higliyhet", "torneio", "tournaments", "tournament", "favicon.ico"]);
+  const reservedRoots = new Set(["admin", "api", "assets", "camera", "super-admin", "streaming", "operador", "highlights", "highlight", "higliyhet", "torneio", "tournaments", "tournament", "favicon.ico"]);
   const directClientMatch =
     reservedRootMatch && !reservedRoots.has(reservedRootMatch[1].toLowerCase()) && !/^campo\d+$/i.test(reservedRootMatch[1])
       ? reservedRootMatch
@@ -3491,31 +3580,35 @@ export default function App() {
     const clientFieldMatch = route.match(/^campo(\d+)$/i);
 
     if (!route) {
-      return <HomePage clientSlug={clientSlug} />;
+      return <ClientRouteGate slug={clientSlug}><HomePage clientSlug={clientSlug} /></ClientRouteGate>;
     }
 
     if (lowerRoute === "dashboard") {
-      return <HomePage clientSlug={clientSlug} />;
+      return <ClientRouteGate slug={clientSlug}><HomePage clientSlug={clientSlug} /></ClientRouteGate>;
     }
 
     if (lowerRoute === "streaming") {
-      return <StreamingPage clientSlug={clientSlug} />;
+      return <ClientRouteGate slug={clientSlug}><StreamingPage clientSlug={clientSlug} /></ClientRouteGate>;
     }
 
     if (["highlights", "highlight", "higliyhet"].includes(lowerRoute)) {
-      return <HomePage clientSlug={clientSlug} section="highlights" />;
+      return <ClientRouteGate slug={clientSlug}><HomePage clientSlug={clientSlug} section="highlights" /></ClientRouteGate>;
     }
 
     if (["torneio", "tournaments", "tournament"].includes(lowerRoute)) {
-      return <HomePage clientSlug={clientSlug} section="torneio" />;
+      return <ClientRouteGate slug={clientSlug}><HomePage clientSlug={clientSlug} section="torneio" /></ClientRouteGate>;
     }
 
     if (clientCameraRouteMatch) {
-      return <CameraPage fieldId={clientCameraRouteMatch[1]} cameraId={clientCameraRouteMatch[2]} clientSlug={clientSlug} />;
+      return (
+        <ClientRouteGate slug={clientSlug}>
+          <CameraPage fieldId={clientCameraRouteMatch[1]} cameraId={clientCameraRouteMatch[2]} clientSlug={clientSlug} />
+        </ClientRouteGate>
+      );
     }
 
     if (clientFieldMatch) {
-      return <CampoPage fieldId={clientFieldMatch[1]} clientSlug={clientSlug} />;
+      return <ClientRouteGate slug={clientSlug}><CampoPage fieldId={clientFieldMatch[1]} clientSlug={clientSlug} /></ClientRouteGate>;
     }
   }
 
@@ -3585,7 +3678,7 @@ export default function App() {
     return <HomePage section="torneio" />;
   }
 
-  if (window.location.pathname.startsWith("/teste")) {
+  if (window.location.pathname.startsWith("/operador")) {
     return <OperatorPage />;
   }
 

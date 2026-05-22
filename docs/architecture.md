@@ -38,7 +38,7 @@ O backend nao tenta acessar IPs locais como `192.168.x.x`.
 Aplicacao Vite/React:
 
 - `/`: Home do cliente para assistir e baixar replays;
-- `/teste`: tela do operador para criar solicitacao `Replay 15s`.
+- `/operador`: tela do operador para criar solicitacao `Replay 15s`.
 
 O frontend consome `VITE_API_BASE_URL` e nao fala com camera.
 

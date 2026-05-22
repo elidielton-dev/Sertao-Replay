@@ -12,7 +12,7 @@ O ponto mais importante: o operador nao grava o video diretamente. Ele cria uma 
 
 ```text
 Home publica:      https://sports-replay-mvp.vercel.app/
-Tela do operador: https://sports-replay-mvp.vercel.app/teste
+Tela do operador: https://sports-replay-mvp.vercel.app/operador
 Painel admin:     https://sports-replay-mvp.vercel.app/admin
 Backend API:      https://sertao-replay.onrender.com/api
 Health check:     https://sertao-replay.onrender.com/api/health
@@ -46,7 +46,7 @@ No computador Windows que fica na mesma rede da camera:
 2. Clique duas vezes em `iniciar-sistema.bat`.
 3. Aguarde a validacao do backend e do FFmpeg.
 4. Deixe aberta a janela `Sertao Replay - capture-server`.
-5. Use a tela do operador em `/teste`.
+5. Use a tela do operador em `/operador`.
 
 O arquivo `iniciar-sistema.bat` chama `scripts/start_system.ps1`, que:
 
@@ -67,7 +67,7 @@ BACKEND_API_URL=https://sertao-replay.onrender.com/api
 OPERATOR_TOKEN=cole_o_token_aqui
 CAMERA_ID=campo-01
 LOCAL_RTSP_URL=rtsp://usuario:senha@192.168.0.6:554/onvif1
-OPERATOR_URL=https://sports-replay-mvp.vercel.app/teste
+OPERATOR_URL=https://sports-replay-mvp.vercel.app/operador
 RTSP_TRANSPORT=tcp
 BUFFER_VIDEO_CODEC=libx264
 BUFFER_FPS=30
@@ -99,7 +99,7 @@ Tambem e possivel manter a URL RTSP apenas no `capture-server\.env` usando `LOCA
 
 1. O `capture-server` abre a camera RTSP com FFmpeg.
 2. Ele mantem um buffer circular local em `capture-server\storage\buffer`.
-3. O operador clica em `Replay 15s` na tela `/teste` ou aperta o botao fisico do Arduino.
+3. O operador clica em `Replay 15s` na tela `/operador` ou aperta o botao fisico do Arduino.
 4. O frontend cria uma solicitacao no backend sem pedir token.
 5. O `capture-server` consulta `/api/replay-requests/pending`.
 6. Ele corta o MP4 localmente.
@@ -112,7 +112,7 @@ Tambem e possivel manter a URL RTSP apenas no `capture-server\.env` usando `LOCA
 ### Frontend - Vercel
 
 - Home publica em `/`.
-- Tela do operador em `/teste`.
+- Tela do operador em `/operador`.
 - Painel admin em `/admin`.
 - Consome apenas a API publica do backend.
 - Nao acessa RTSP e nao conhece usuario/senha da camera.

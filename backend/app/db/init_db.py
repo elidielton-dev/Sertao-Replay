@@ -125,6 +125,7 @@ def _seed_demo_tenants() -> None:
 
     db = SessionLocal()
     try:
+        _remove_test_tenants(db)
         clients = [
             Client(
                 id="mvp",
@@ -140,14 +141,6 @@ def _seed_demo_tenants() -> None:
                 slug="arena-society-custodia",
                 logo_url="/assets/logo-sertao-replay-nav.png",
                 plan="pro",
-                is_active=True,
-            ),
-            Client(
-                id="arena-fut7-teste",
-                name="Arena Fut7 Teste",
-                slug="arena-fut7-teste",
-                logo_url="/assets/logo-sertao-replay-nav.png",
-                plan="starter",
                 is_active=True,
             ),
         ]
@@ -171,14 +164,6 @@ def _seed_demo_tenants() -> None:
                 password_hash=hash_password("admin123"),
                 role="admin",
             ),
-            User(
-                id="admin-fut7",
-                client_id="arena-fut7-teste",
-                name="Admin Fut7",
-                email="admin@fut7.test",
-                password_hash=hash_password("admin123"),
-                role="admin",
-            ),
         ]
         for user in users:
             if not db.get(User, user.id):
@@ -195,16 +180,6 @@ def _seed_demo_tenants() -> None:
                 enabled=True,
                 notes="Camera principal do MVP.",
             ),
-            CameraConfig(
-                id="arena-fut7-campo-01",
-                client_id="arena-fut7-teste",
-                name="Campo Teste",
-                slug="campo-teste",
-                rtsp_url="rtsp://usuario:senha@192.168.0.7:554/onvif1",
-                status="offline",
-                enabled=True,
-                notes="Camera de teste isolada do segundo tenant.",
-            ),
         ]
         for camera in demo_cameras:
             if not db.get(CameraConfig, camera.id):
@@ -215,6 +190,14 @@ def _seed_demo_tenants() -> None:
         logger.info("Seed multi-tenant verificado.")
     finally:
         db.close()
+
+
+def _remove_test_tenants(db) -> None:
+    removed_client_ids = ("arena-fut7-teste",)
+    for model in (ReplayRequestQueue, ReplayEvent, ChatMessage, SystemLog, CameraConfig, Replay, User):
+        db.query(model).filter(model.client_id.in_(removed_client_ids)).delete(synchronize_session=False)
+
+    db.query(Client).filter(Client.id.in_(removed_client_ids)).delete(synchronize_session=False)
 
 
 def _move_operational_data_to_mvp(db) -> None:

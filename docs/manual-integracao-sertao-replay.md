@@ -31,7 +31,7 @@ Use estas URLs como referencia, ajustando se o deploy mudar:
 
 ```text
 Home publica:      https://sports-replay-mvp.vercel.app/
-Tela do operador: https://sports-replay-mvp.vercel.app/teste
+Tela do operador: https://sports-replay-mvp.vercel.app/operador
 Painel admin:     https://sports-replay-mvp.vercel.app/admin
 Backend API:      https://sertao-replay.onrender.com/api
 Health check:     https://sertao-replay.onrender.com/api/health
@@ -54,7 +54,7 @@ Antes de instalar, confirme:
 
 Home publica (`/`): lista replays prontos, permite assistir e baixar.
 
-Tela do operador (`/teste`): botao `Replay 15s`, escolha da camera e campo de titulo opcional.
+Tela do operador (`/operador`): botao `Replay 15s`, escolha da camera e campo de titulo opcional.
 
 Painel admin (`/admin`): cadastro de cameras, status da camera e logs do sistema. Exige token de operador em producao.
 
@@ -93,7 +93,7 @@ BACKEND_API_URL=https://sertao-replay.onrender.com/api
 OPERATOR_TOKEN=cole_o_token_aqui
 CAMERA_ID=campo-01
 LOCAL_RTSP_URL=rtsp://usuario:senha@192.168.0.6:554/onvif1
-OPERATOR_URL=https://sports-replay-mvp.vercel.app/teste
+OPERATOR_URL=https://sports-replay-mvp.vercel.app/operador
 RTSP_TRANSPORT=tcp
 BUFFER_VIDEO_CODEC=libx264
 BUFFER_FPS=30
@@ -165,7 +165,7 @@ Ao iniciar, ele:
 {"ok": true, "message": "Sertao Replay API online"}
 ```
 
-3. Abra `https://sports-replay-mvp.vercel.app/teste`.
+3. Abra `https://sports-replay-mvp.vercel.app/operador`.
 4. Confirme se a camera aparece como `recording`.
 5. Digite um titulo opcional, por exemplo `teste instalacao`.
 6. Clique em `Replay 15s` ou aperte o botao fisico do Arduino.
@@ -180,7 +180,7 @@ Antes do jogo:
 1. Ligue camera, roteador/switch e servidor local.
 2. Clique em `iniciar-sistema.bat`.
 3. Espere o status da camera ficar `recording`.
-4. Abra a tela `/teste`.
+4. Abra a tela `/operador`.
 5. Faca um replay de teste.
 6. Confirme se aparece na Home.
 

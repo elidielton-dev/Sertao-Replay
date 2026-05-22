@@ -40,7 +40,7 @@ class CaptureServer:
     def __init__(self) -> None:
         load_dotenv()
         self.backend_api_url = env("BACKEND_API_URL").rstrip("/")
-        self.operator_token = env("OPERATOR_TOKEN")
+        self.operator_token = env("OPERATOR_TOKEN", required=False)
         self.client_id = env("CLIENT_ID", required=False)
         self.client_slug = env("CLIENT_SLUG", required=False)
         self.camera_id = env("CAMERA_ID")
@@ -69,7 +69,8 @@ class CaptureServer:
         self.last_status_report_at = 0.0
         self.last_snapshot_upload_at = 0.0
         self.session = requests.Session()
-        self.session.headers.update({"X-Operator-Token": self.operator_token})
+        if self.operator_token:
+            self.session.headers.update({"X-Operator-Token": self.operator_token})
         if self.client_id:
             self.session.headers.update({"X-Client-Id": self.client_id})
         if self.client_slug:

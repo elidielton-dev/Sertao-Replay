@@ -195,7 +195,7 @@ $envValues["CAMERA_SOURCE_RTSP_URL"] = $cameraSourceRtspUrl
 $envValues["CAMERA_SOURCE_RTSP_TRANSPORT"] = $cameraSourceTransport
 $envValues["LOCAL_RTSP_URL"] = $CloudRtspUrl
 $envValues["RTSP_TRANSPORT"] = "tcp"
-$envValues["OPERATOR_URL"] = "https://sports-replay-mvp.vercel.app/teste"
+$envValues["OPERATOR_URL"] = "https://sports-replay-mvp.vercel.app/operador"
 Save-DotEnv $captureEnv $envValues
 
 Write-Step "Publicando camera no servidor publico"
