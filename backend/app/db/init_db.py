@@ -218,11 +218,12 @@ def _seed_demo_tenants() -> None:
 
 
 def _move_operational_data_to_mvp(db) -> None:
+    legacy_client_ids = ("default", "")
     for model in (CameraConfig, Replay, ReplayRequestQueue, ReplayEvent, ChatMessage, SystemLog):
-        db.query(model).update({"client_id": "mvp"}, synchronize_session=False)
+        db.query(model).filter(model.client_id.in_(legacy_client_ids)).update({"client_id": "mvp"}, synchronize_session=False)
 
     camera = db.get(CameraConfig, "campo-01")
-    if camera:
+    if camera and camera.client_id in {"default", "", "arena-society-custodia"}:
         camera.client_id = "mvp"
         camera.name = "Campo 01"
         camera.slug = "campo-01"
