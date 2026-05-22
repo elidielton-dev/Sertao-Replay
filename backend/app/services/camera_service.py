@@ -131,7 +131,8 @@ class CameraService:
 
         detail = errors[-1] if errors else "nenhum caminho RTSP respondeu"
         if self._is_private_camera_host(host):
-            fallback_url = f"rtsp://{host}:{port}/"
+            fallback_path = "/ronaldinho-demo" if port == 8554 else "/"
+            fallback_url = f"rtsp://{host}:{port}{fallback_path}"
             logger.warning(
                 "RTSP privado nao validado pelo backend remoto; usando fallback. host=%s detail=%s",
                 host,
