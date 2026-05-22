@@ -4,7 +4,6 @@
   Building2,
   Camera,
   CheckCircle2,
-  CreditCard,
   Download,
   ExternalLink,
   Eye,
@@ -2688,6 +2687,7 @@ function SuperAdminPage() {
   const [clients, setClients] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [selectedClient, setSelectedClient] = useState(null);
+  const [clientCredentials, setClientCredentials] = useState({});
   const [message, setMessage] = useState("Entre para carregar os clientes.");
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
@@ -2708,6 +2708,9 @@ function SuperAdminPage() {
   const inactiveClients = clients.length - activeClients;
   const totalCameras = clients.reduce((total, client) => total + Number(client.cameras_total || 0), 0);
   const totalReplays = clients.reduce((total, client) => total + Number(client.replays_total || 0), 0);
+  const totalAdmins = clients.reduce((total, client) => total + Number(client.users?.length || 0), 0);
+  const selectedAdmin = selectedClient?.users?.[0] || null;
+  const selectedPassword = selectedClient ? clientCredentials[selectedClient.id] : "";
   const isSuperAuthenticated = Boolean(superSession && tokenValue());
 
   function tokenValue() {
@@ -2847,8 +2850,9 @@ function SuperAdminPage() {
         method: "POST",
         body: JSON.stringify(payload),
       }));
+      setClientCredentials((current) => ({ ...current, [saved.id]: payload.admin_password }));
       resetForm();
-      setMessage(`Cliente ${saved.name} criado. Login: ${payload.admin_email}`);
+      setMessage(`Cliente ${saved.name} criado. Usuario: ${payload.admin_email} | Senha: ${payload.admin_password}`);
       await loadClients(saved.id);
     } catch (error) {
       setMessage(error.message);
@@ -2896,7 +2900,9 @@ function SuperAdminPage() {
         <div className="super-admin-login-lights" aria-hidden="true" />
         <section className="super-admin-login-shell">
           <div className="super-admin-login-brand">
-            <img alt="Sertao Replay" src="/assets/logo-sertao-replay-nav.png" />
+            <span className="super-admin-logo-mark" aria-label="Sertao Replay">
+              <img alt="" src="/assets/logo-sertao-replay-nav.png" />
+            </span>
             <div>
               <h1>Super Admin</h1>
               <p>Acesso restrito ao controle de clientes</p>
@@ -2958,8 +2964,10 @@ function SuperAdminPage() {
       <header className="super-admin-topbar">
         <div className="super-admin-brand">
           <Menu size={22} />
-          <img alt="Sertao Replay" src="/assets/logo-sertao-replay-nav.png" />
-          <span>Super Admin</span>
+          <span className="super-admin-logo-mark" aria-label="Sertao Replay">
+            <img alt="" src="/assets/logo-sertao-replay-nav.png" />
+          </span>
+          <span className="super-admin-title">Super Admin</span>
         </div>
         <nav className="super-admin-nav" aria-label="Super admin">
           <a href="#dashboard">Dashboard</a>
@@ -2990,46 +2998,58 @@ function SuperAdminPage() {
 
         <section className="super-admin-stats">
           <article className="super-admin-card">
-            <div><CreditCard size={24} /><span>+12.5%</span></div>
-            <h2>Receita estimada</h2>
-            <strong>R$ 142.850,00</strong>
-            <i style={{ width: "75%" }} />
+            <div><Building2 size={22} /><span>{inactiveClients} inativos</span></div>
+            <h2>Clientes</h2>
+            <strong>{clients.length}</strong>
+            <p>{activeClients} ativos na plataforma</p>
           </article>
           <article className="super-admin-card is-featured">
-            <div><Users size={24} /><span>{activeClients} ativos</span></div>
-            <h2>Clientes cadastrados</h2>
-            <strong>{clients.length}</strong>
-            <p>{inactiveClients} inativos</p>
+            <div><Video size={22} /><span>{totalCameras} cameras</span></div>
+            <h2>Replays</h2>
+            <strong>{totalReplays}</strong>
+            <p>Conteudo registrado nos clientes</p>
           </article>
           <article className="super-admin-card">
-            <div><Video size={24} /><span>{totalCameras} cameras</span></div>
-            <h2>Replays / estrutura</h2>
-            <strong>{totalReplays}</strong>
-            <p>Replays nos tenants</p>
+            <div><Users size={22} /><span>logins</span></div>
+            <h2>Administradores</h2>
+            <strong>{totalAdmins}</strong>
+            <p>Acessos administrativos criados</p>
           </article>
         </section>
 
         <section className="super-admin-grid">
           <section className="super-admin-main">
             <div className="super-admin-section-title" id="novo-cliente">
-              <h2><UserPlus size={24} /> Criar cliente e login</h2>
+              <h2><UserPlus size={22} /> Criar Cliente</h2>
             </div>
 
             <form className="super-admin-form super-admin-card" onSubmit={submitClient}>
+              <div className="super-admin-form-section">
+                <strong>Dados do cliente</strong>
+                <span>Informacoes usadas nas paginas publica e administrativa.</span>
+              </div>
               <div className="super-admin-form-grid">
                 <label>Nome da empresa<input value={form.name} onChange={(event) => updateForm("name", event.target.value)} required /></label>
                 <label>Slug publico<input value={form.slug} onChange={(event) => updateForm("slug", event.target.value)} placeholder="arena-exemplo" required /></label>
-                <label>Plano<input value={form.plan} onChange={(event) => updateForm("plan", event.target.value)} /></label>
+                <label>Plano<select value={form.plan} onChange={(event) => updateForm("plan", event.target.value)}><option value="starter">Starter</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></label>
                 <label>Email da empresa<input value={form.company_email} onChange={(event) => updateForm("company_email", event.target.value)} type="email" /></label>
                 <label>Telefone<input value={form.company_phone} onChange={(event) => updateForm("company_phone", event.target.value)} /></label>
                 <label>CNPJ / documento<input value={form.document} onChange={(event) => updateForm("document", event.target.value)} /></label>
                 <label className="is-wide">Endereco<input value={form.address} onChange={(event) => updateForm("address", event.target.value)} /></label>
-                <label>Nome do admin<input value={form.admin_name} onChange={(event) => updateForm("admin_name", event.target.value)} required /></label>
-                <label>Email de login<input value={form.admin_email} onChange={(event) => updateForm("admin_email", event.target.value)} type="email" required /></label>
-                <label>Senha inicial<input value={form.admin_password} onChange={(event) => updateForm("admin_password", event.target.value)} type="password" required /></label>
               </div>
-              <label className="super-admin-check"><input checked={form.is_active} onChange={(event) => updateForm("is_active", event.target.checked)} type="checkbox" /> Cliente ativo</label>
-              <button className="super-admin-primary" disabled={busy} type="submit">{busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />} Criar cliente</button>
+              <div className="super-admin-form-section">
+                <strong>Login administrativo</strong>
+                <span>Usuario e senha que o cliente usara para acessar o admin.</span>
+              </div>
+              <div className="super-admin-form-grid">
+                <label>Nome do admin<input value={form.admin_name} onChange={(event) => updateForm("admin_name", event.target.value)} required /></label>
+                <label>Usuario do cliente<input value={form.admin_email} onChange={(event) => updateForm("admin_email", event.target.value)} placeholder="email de login" type="email" required /></label>
+                <label>Senha do cliente<input value={form.admin_password} onChange={(event) => updateForm("admin_password", event.target.value)} placeholder="senha inicial" type="text" required /></label>
+              </div>
+              <div className="super-admin-form-footer">
+                <label className="super-admin-check"><input checked={form.is_active} onChange={(event) => updateForm("is_active", event.target.checked)} type="checkbox" /> Cliente ativo</label>
+                <button className="super-admin-primary" disabled={busy} type="submit">{busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />} Criar cliente</button>
+              </div>
             </form>
 
             <div className="super-admin-section-title" id="clientes">
@@ -3039,7 +3059,8 @@ function SuperAdminPage() {
             <div className="super-admin-client-list">
               {clients.map((client) => (
                 <button className={`super-admin-client-row ${selectedId === client.id ? "is-active" : ""}`} onClick={() => openClient(client.id)} type="button" key={client.id}>
-                  <span><strong>{client.name}</strong><small>/{client.slug} · {client.users?.[0]?.email || "sem login"}</small></span>
+                  <span><strong>{client.name}</strong><small>Usuario: {client.users?.[0]?.email || "sem login"} · /{client.slug}</small></span>
+                  <span className="super-admin-client-metrics"><small>{client.cameras_total || 0} cameras</small><small>{client.replays_total || 0} replays</small></span>
                   <em className={client.is_active ? "is-active" : "is-inactive"}>{client.is_active ? "ativo" : "inativo"}</em>
                 </button>
               ))}
@@ -3049,31 +3070,51 @@ function SuperAdminPage() {
 
           <aside className="super-admin-sidebar">
             <article className="super-admin-card">
-              <h2><ShieldCheck size={24} /> Acesso do cliente</h2>
+              <h2><ShieldCheck size={22} /> Cliente Selecionado</h2>
               {selectedClient ? (
                 <div className="super-admin-detail">
-                  <strong>{selectedClient.name}</strong>
-                  <span>{selectedClient.company_email || "Email da empresa nao informado"}</span>
-                  <span>{selectedClient.company_phone || "Telefone nao informado"}</span>
-                  <span>{selectedClient.document || "Documento nao informado"}</span>
-                  <span>{selectedClient.address || "Endereco nao informado"}</span>
-                  <a href={selectedClient.admin_path} target="_blank" rel="noreferrer"><ExternalLink size={17} /> Admin: {selectedClient.admin_path}</a>
-                  <a href={selectedClient.public_path} target="_blank" rel="noreferrer"><ExternalLink size={17} /> Publico: {selectedClient.public_path}</a>
+                  <div className="super-admin-detail-head">
+                    <strong>{selectedClient.name}</strong>
+                    <em className={selectedClient.is_active ? "is-active" : "is-inactive"}>{selectedClient.is_active ? "ativo" : "inativo"}</em>
+                  </div>
+                  <div className="super-admin-credential-card">
+                    <span>Login do cliente</span>
+                    <p><b>Usuario</b><strong>{selectedAdmin?.email || "Usuario nao cadastrado"}</strong></p>
+                    <p><b>Senha</b><strong>{selectedPassword || "Senha nao exibida"}</strong></p>
+                    {!selectedPassword ? <small>Por seguranca, senhas antigas nao ficam visiveis. Ao criar um novo cliente, a senha aparece aqui nesta sessao.</small> : null}
+                  </div>
+                  <div className="super-admin-info-list">
+                    <p><span>Empresa</span><b>{selectedClient.company_email || "Email nao informado"}</b></p>
+                    <p><span>Telefone</span><b>{selectedClient.company_phone || "Nao informado"}</b></p>
+                    <p><span>Documento</span><b>{selectedClient.document || "Nao informado"}</b></p>
+                    <p><span>Endereco</span><b>{selectedClient.address || "Nao informado"}</b></p>
+                    <p><span>Plano</span><b>{selectedClient.plan || "Nao informado"}</b></p>
+                  </div>
                   <div className="super-admin-detail-grid">
-                    <div><b>{selectedClient.cameras_total}</b><small>Cameras</small></div>
-                    <div><b>{selectedClient.replays_total}</b><small>Replays</small></div>
+                    <div><b>{selectedClient.cameras_total || 0}</b><small>Cameras</small></div>
+                    <div><b>{selectedClient.replays_total || 0}</b><small>Replays</small></div>
+                  </div>
+                  <div className="super-admin-link-list">
+                    <a href={selectedClient.admin_path} target="_blank" rel="noreferrer"><ExternalLink size={17} /> Admin: {selectedClient.admin_path}</a>
+                    <a href={selectedClient.public_path} target="_blank" rel="noreferrer"><ExternalLink size={17} /> Publico: {selectedClient.public_path}</a>
+                  </div>
+                  <div className="super-admin-form-section">
+                    <strong>Usuarios</strong>
+                    <span>{selectedAdmin ? `Admin principal: ${selectedAdmin.name}` : "Nenhum admin cadastrado"}</span>
                   </div>
                   <div className="super-admin-user-list">
                     {(selectedClient.users || []).map((user) => (
                       <p key={user.id}><strong>{user.name}</strong><span>{user.email}</span></p>
                     ))}
                   </div>
-                  <button className="super-admin-secondary" onClick={() => toggleClient(selectedClient)} type="button">
-                    <Ban size={18} /> {selectedClient.is_active ? "Desativar cliente" : "Ativar cliente"}
-                  </button>
-                  <button className="super-admin-danger" onClick={() => deleteClient(selectedClient)} type="button">
-                    <Trash2 size={18} /> Excluir cliente
-                  </button>
+                  <div className="super-admin-detail-actions">
+                    <button className="super-admin-secondary" onClick={() => toggleClient(selectedClient)} type="button">
+                      <Ban size={18} /> {selectedClient.is_active ? "Desativar cliente" : "Ativar cliente"}
+                    </button>
+                    <button className="super-admin-danger" onClick={() => deleteClient(selectedClient)} type="button">
+                      <Trash2 size={18} /> Excluir cliente
+                    </button>
+                  </div>
                 </div>
               ) : <p>Selecione um cliente para ver todos os detalhes.</p>}
             </article>
