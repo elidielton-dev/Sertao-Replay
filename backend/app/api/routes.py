@@ -87,6 +87,11 @@ class SuperAdminClientUpdate(BaseModel):
     is_active: bool | None = None
 
 
+class SuperAdminLoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=180)
+    password: str = Field(min_length=1, max_length=200)
+
+
 def require_operator(
     request: Request,
     x_operator_token: str | None = Header(default=None),
@@ -391,6 +396,17 @@ def public_client_replay(slug: str, replay_id: int, db: Session = Depends(get_db
     if not replay:
         raise HTTPException(status_code=404, detail="Replay nao encontrado.")
     return replay
+
+
+@router.post("/super-admin/login")
+def login_super_admin(payload: SuperAdminLoginRequest):
+    if settings.app_env != "production" and not settings.operator_token:
+        return {"ok": True, "operator_token": payload.password, "user": {"email": payload.email.strip().lower(), "role": "super_admin"}}
+
+    if settings.operator_token and payload.password == settings.operator_token:
+        return {"ok": True, "operator_token": settings.operator_token, "user": {"email": payload.email.strip().lower(), "role": "super_admin"}}
+
+    raise HTTPException(status_code=401, detail="Login do super admin invalido.")
 
 
 @router.get("/super-admin/clients")

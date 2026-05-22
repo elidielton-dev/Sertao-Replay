@@ -628,6 +628,147 @@ h1 {
   font-family: "Hanken Grotesk", Inter, Arial, sans-serif;
 }
 
+.super-admin-login-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  color: #e0e3e0;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(161, 251, 0, 0.2) 0%, transparent 42%),
+    radial-gradient(circle at 50% 50%, #1a2a10 0%, #101413 70%);
+  font-family: "Hanken Grotesk", Inter, Arial, sans-serif;
+}
+
+.super-admin-login-lights {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.super-admin-login-shell {
+  width: min(460px, 100%);
+}
+
+.super-admin-login-brand {
+  display: grid;
+  justify-items: center;
+  gap: 22px;
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.super-admin-login-brand img {
+  width: min(260px, 78vw);
+  filter: drop-shadow(0 0 15px rgba(141, 220, 0, 0.3));
+}
+
+.super-admin-login-brand h1 {
+  margin: 0;
+  color: #a1fb00;
+  font-family: Anybody, Inter, sans-serif;
+  font-size: 30px;
+}
+
+.super-admin-login-brand p,
+.super-admin-login-form label,
+.super-admin-login-message {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.super-admin-login-brand p {
+  margin: 8px 0 0;
+  color: #c0caad;
+}
+
+.super-admin-login-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(141, 220, 0, 0.22);
+  border-radius: 14px;
+  padding: 30px;
+  background: rgba(28, 32, 31, 0.74);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(20px);
+}
+
+.super-admin-login-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #8ddc00, transparent);
+  opacity: 0.7;
+}
+
+.super-admin-login-form {
+  display: grid;
+  gap: 14px;
+}
+
+.super-admin-login-form label {
+  color: #c0caad;
+}
+
+.super-admin-login-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(138, 148, 122, 0.55);
+  color: rgba(224, 227, 224, 0.62);
+}
+
+.super-admin-login-input:focus-within {
+  border-color: #8ddc00;
+  box-shadow: 0 4px 12px -4px rgba(141, 220, 0, 0.4);
+}
+
+.super-admin-login-input input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  padding: 14px 0;
+  color: #ffffff;
+  background: transparent;
+  outline: 0;
+}
+
+.super-admin-login-visibility {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  color: #c0caad;
+  background: transparent;
+  cursor: pointer;
+}
+
+.super-admin-login-submit {
+  display: inline-flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+  border: 0;
+  border-radius: 999px;
+  color: #102000;
+  background: #a1fb00;
+  font-family: Anybody, Inter, sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.super-admin-login-message {
+  margin-top: 18px;
+  color: #c0caad;
+  text-align: center;
+}
+
 .super-admin-topbar {
   position: fixed;
   z-index: 60;
@@ -647,7 +788,7 @@ h1 {
 .super-admin-brand,
 .super-admin-nav,
 .super-admin-heading,
-.super-admin-token,
+.super-admin-session-actions,
 .super-admin-section-title,
 .super-admin-card > div:first-child,
 .super-admin-primary,
@@ -741,13 +882,12 @@ h1 {
   color: #a1fb00;
 }
 
-.super-admin-token {
+.super-admin-session-actions {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
 }
 
-.super-admin-token input,
 .super-admin-form input {
   border: 1px solid rgba(141, 220, 0, 0.2);
   border-radius: 10px;
@@ -757,13 +897,12 @@ h1 {
   outline: none;
 }
 
-.super-admin-token input:focus,
 .super-admin-form input:focus {
   border-color: #a1fb00;
   box-shadow: 0 0 0 3px rgba(161, 251, 0, 0.1);
 }
 
-.super-admin-token button,
+.super-admin-session-actions button,
 .super-admin-section-title button {
   display: inline-flex;
   min-height: 44px;
@@ -775,6 +914,14 @@ h1 {
   color: #a1fb00;
   background: rgba(28, 32, 31, 0.8);
   cursor: pointer;
+}
+
+.super-admin-session-actions span {
+  color: #c0caad;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .super-admin-message {
@@ -879,13 +1026,14 @@ h1 {
 
 .super-admin-form {
   display: grid;
-  gap: 18px;
+  gap: 20px;
+  max-width: 720px;
 }
 
 .super-admin-form-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: 1fr;
+  gap: 16px;
 }
 
 .super-admin-form label {
@@ -895,7 +1043,7 @@ h1 {
 }
 
 .super-admin-form label.is-wide {
-  grid-column: span 3;
+  grid-column: auto;
 }
 
 .super-admin-check {

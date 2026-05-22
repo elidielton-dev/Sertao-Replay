@@ -51,6 +51,7 @@ const DEFAULT_HLS_CAMERA_MAP = {
   "campo-01": `${API_BASE}/cameras/campo-01/hls/index.m3u8`,
 };
 const OPERATOR_TOKEN_KEY = "sertao_operator_token";
+const SUPER_ADMIN_SESSION_KEY = "sertao_super_admin_session";
 const ADMIN_SESSION_KEY = "sertao_admin_session";
 const REPLAY_HOTKEY_SECONDS = {
   F13: 15,
@@ -2445,6 +2446,10 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
     { href: `${adminBase}/dashboard`, label: "Inicio", icon: Home, key: "dashboard" },
   ];
 
+  if (!token) {
+    return <AdminLoginPage />;
+  }
+
   return (
     <main className="tenant-admin-page">
       <header className="tenant-admin-topbar">
@@ -2671,10 +2676,19 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
 
 function SuperAdminPage() {
   const [token, setToken] = useState(() => localStorage.getItem(OPERATOR_TOKEN_KEY) || "");
+  const [superSession, setSuperSession] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(SUPER_ADMIN_SESSION_KEY) || "null");
+    } catch {
+      return null;
+    }
+  });
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [showSuperPassword, setShowSuperPassword] = useState(false);
   const [clients, setClients] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [selectedClient, setSelectedClient] = useState(null);
-  const [message, setMessage] = useState("Informe o token e carregue os clientes.");
+  const [message, setMessage] = useState("Entre para carregar os clientes.");
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -2694,6 +2708,7 @@ function SuperAdminPage() {
   const inactiveClients = clients.length - activeClients;
   const totalCameras = clients.reduce((total, client) => total + Number(client.cameras_total || 0), 0);
   const totalReplays = clients.reduce((total, client) => total + Number(client.replays_total || 0), 0);
+  const isSuperAuthenticated = Boolean(superSession && tokenValue());
 
   function tokenValue() {
     return token.trim();
@@ -2705,6 +2720,24 @@ function SuperAdminPage() {
 
   function updateForm(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateLoginForm(field, value) {
+    setLoginForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function saveSuperSession(session, nextToken) {
+    if (session && nextToken) {
+      localStorage.setItem(SUPER_ADMIN_SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem(OPERATOR_TOKEN_KEY, nextToken);
+      setSuperSession(session);
+      setToken(nextToken);
+    } else {
+      localStorage.removeItem(SUPER_ADMIN_SESSION_KEY);
+      localStorage.removeItem(OPERATOR_TOKEN_KEY);
+      setSuperSession(null);
+      setToken("");
+    }
   }
 
   function resetForm() {
@@ -2724,6 +2757,12 @@ function SuperAdminPage() {
   }
 
   async function loadClients(nextSelectedId = selectedId) {
+    if (!tokenValue()) {
+      setMessage("Login do super admin obrigatorio.");
+      saveSuperSession(null);
+      return;
+    }
+
     setBusy(true);
     try {
       const data = await apiRequest("/super-admin/clients", superAdminOptions());
@@ -2736,10 +2775,50 @@ function SuperAdminPage() {
       setMessage("Clientes carregados.");
     } catch (error) {
       setMessage(error.message);
+      if (String(error.message).toLowerCase().includes("operador") || String(error.message).toLowerCase().includes("nao autorizado")) {
+        saveSuperSession(null);
+      }
     } finally {
       setBusy(false);
     }
   }
+
+  async function submitSuperLogin(event) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("Validando acesso...");
+    try {
+      const data = await apiRequest("/super-admin/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: loginForm.email.trim(),
+          password: loginForm.password,
+        }),
+      });
+      const nextToken = data.operator_token || loginForm.password;
+      saveSuperSession({ user: data.user || { email: loginForm.email.trim(), role: "super_admin" } }, nextToken);
+      setLoginForm({ email: "", password: "" });
+      setMessage("Login realizado.");
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function logoutSuperAdmin() {
+    saveSuperSession(null);
+    setClients([]);
+    setSelectedClient(null);
+    setSelectedId("");
+    setMessage("Sessao encerrada.");
+  }
+
+  useEffect(() => {
+    if (isSuperAuthenticated && !clients.length) {
+      loadClients("");
+    }
+  }, [isSuperAuthenticated]);
 
   async function openClient(clientId) {
     setSelectedId(clientId);
@@ -2811,6 +2890,69 @@ function SuperAdminPage() {
     }
   }
 
+  if (!isSuperAuthenticated) {
+    return (
+      <main className="super-admin-login-page">
+        <div className="super-admin-login-lights" aria-hidden="true" />
+        <section className="super-admin-login-shell">
+          <div className="super-admin-login-brand">
+            <img alt="Sertao Replay" src="/assets/logo-sertao-replay-nav.png" />
+            <div>
+              <h1>Super Admin</h1>
+              <p>Acesso restrito ao controle de clientes</p>
+            </div>
+          </div>
+
+          <article className="super-admin-login-card">
+            <form className="super-admin-login-form" onSubmit={submitSuperLogin}>
+              <label htmlFor="superAdminEmail">Usuario</label>
+              <div className="super-admin-login-input">
+                <UserRound size={20} />
+                <input
+                  id="superAdminEmail"
+                  value={loginForm.email}
+                  onChange={(event) => updateLoginForm("email", event.target.value)}
+                  placeholder="seu@email.com"
+                  type="email"
+                  autoComplete="email"
+                  required
+                />
+              </div>
+
+              <label htmlFor="superAdminPassword">Senha</label>
+              <div className="super-admin-login-input">
+                <Lock size={20} />
+                <input
+                  id="superAdminPassword"
+                  value={loginForm.password}
+                  onChange={(event) => updateLoginForm("password", event.target.value)}
+                  placeholder="Senha do super admin"
+                  type={showSuperPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                />
+                <button
+                  className="super-admin-login-visibility"
+                  onClick={() => setShowSuperPassword((current) => !current)}
+                  type="button"
+                  aria-label={showSuperPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showSuperPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+
+              <button className="super-admin-login-submit" disabled={busy} type="submit">
+                {busy ? <Loader2 className="spin" size={22} /> : <LogIn size={22} />}
+                {busy ? "Entrando..." : "Entrar no Super Admin"}
+              </button>
+            </form>
+            {message ? <div className="super-admin-login-message">{message}</div> : null}
+          </article>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="super-admin-page">
       <header className="super-admin-topbar">
@@ -2825,7 +2967,9 @@ function SuperAdminPage() {
           <a href="#novo-cliente">Novo cliente</a>
           <a href="#seguranca">Seguranca</a>
         </nav>
-        <button className="super-admin-avatar" type="button" title="Super admin">SA</button>
+        <button className="super-admin-avatar" onClick={logoutSuperAdmin} type="button" title="Sair">
+          {(superSession?.user?.email || "SA").slice(0, 2).toUpperCase()}
+        </button>
       </header>
 
       <section className="super-admin-shell" id="dashboard">
@@ -2834,9 +2978,11 @@ function SuperAdminPage() {
             <h1>Super Admin Dashboard</h1>
             <p>Status do sistema: <strong>otimizado</strong></p>
           </div>
-          <div className="super-admin-token">
-            <input value={token} onChange={(event) => setToken(event.target.value)} placeholder="Token de operador" type="password" />
-            <button onClick={() => loadClients()} disabled={busy} type="button">{busy ? <Loader2 className="spin" size={18} /> : <RotateCcw size={18} />} Carregar</button>
+          <div className="super-admin-session-actions">
+            <span>{superSession?.user?.email || "super admin"}</span>
+            <button onClick={() => loadClients()} disabled={busy} type="button">
+              {busy ? <Loader2 className="spin" size={18} /> : <RotateCcw size={18} />} Atualizar
+            </button>
           </div>
         </div>
 
