@@ -1160,6 +1160,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
   const [selectedReplayId, setSelectedReplayId] = useState("");
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
+  const [requestMessage, setRequestMessage] = useState("");
   const field = registeredFields.find((item) => item.id === String(fieldId));
   const camera = field?.cameras.find((item) => item.id === String(cameraId));
   const previewImage = camera?.image || cameraTemplate(cameraId || 1).image;
@@ -1194,6 +1195,26 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
   }, [clientSlug]);
 
   useEffect(() => {
+    let cancelled = false;
+    async function refreshReplays() {
+      try {
+        const replayData = await apiRequest(clientApiPath(clientSlug, "/replays"));
+        if (!cancelled) {
+          setReplays(Array.isArray(replayData) ? replayData : []);
+        }
+      } catch {
+        // Keep current replays if a refresh fails.
+      }
+    }
+
+    const timer = window.setInterval(refreshReplays, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [clientSlug]);
+
+  useEffect(() => {
     if (!cameraReplays.length) {
       setSelectedReplayId("");
       return;
@@ -1203,6 +1224,42 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
       setSelectedReplayId(String(cameraReplays[0].id));
     }
   }, [cameraReplays, selectedReplayId]);
+
+  useEffect(() => {
+    async function requestReplay(seconds) {
+      if (!camera?.backendId) {
+        return;
+      }
+
+      try {
+        const path = clientSlug ? `/public/clients/${encodeURIComponent(clientSlug)}/replay-requests` : "/replay-requests";
+        const data = await apiRequest(path, {
+          method: "POST",
+          body: JSON.stringify({
+            camera_id: camera.backendId,
+            seconds,
+            label: `Replay ${seconds}s - Arduino`,
+          }),
+        });
+        setRequestMessage(data?.message || `Solicitacao de replay ${seconds}s enviada.`);
+      } catch (hotkeyError) {
+        setRequestMessage(hotkeyError.message || "Nao foi possivel solicitar replay.");
+      }
+    }
+
+    function handleReplayHotkey(event) {
+      const seconds = replaySecondsFromHotkey(event);
+      if (!seconds || event.repeat) {
+        return;
+      }
+
+      event.preventDefault();
+      requestReplay(seconds);
+    }
+
+    window.addEventListener("keydown", handleReplayHotkey);
+    return () => window.removeEventListener("keydown", handleReplayHotkey);
+  }, [camera?.backendId, clientSlug]);
 
   return (
     <main className="min-h-screen bg-[#0a0f0d] pb-28 text-white lg:pb-10">
@@ -1233,6 +1290,14 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
             <div className="mb-4 rounded-2xl border border-white/5 bg-[#1c221e]/60 p-4 text-sm text-[#a0a0a0]">
               <strong className="block text-white">Nao foi possivel carregar os dados desta camera.</strong>
               <span>{error}</span>
+            </div>
+          ) : null}
+
+
+          {requestMessage ? (
+            <div className="mb-4 rounded-2xl border border-[#79e043]/30 bg-[#1c221e]/60 p-4 text-sm text-[#c5d5be]">
+              <strong className="block text-white">Replay</strong>
+              <span>{requestMessage}</span>
             </div>
           ) : null}
 
@@ -1589,6 +1654,28 @@ function StreamingPage({ clientSlug = "" }) {
   const [showChatNameModal, setShowChatNameModal] = useState(() => !loadStoredChatUser(clientSlug));
   const [previewReplayId, setPreviewReplayId] = useState("");
 
+  const requestReplayFromStreaming = useCallback(async (seconds = 15) => {
+    if (!selectedCamera?.id) {
+      setMessage("Selecione uma camera para solicitar replay.");
+      return;
+    }
+
+    try {
+      const path = clientSlug ? `/public/clients/${encodeURIComponent(clientSlug)}/replay-requests` : "/replay-requests";
+      const data = await apiRequest(path, {
+        method: "POST",
+        body: JSON.stringify({
+          camera_id: selectedCamera.id,
+          seconds,
+          label: `Replay ${seconds}s - Atleta`,
+        }),
+      });
+      setMessage(data?.message || `Solicitacao de replay ${seconds}s enviada.`);
+    } catch (error) {
+      setMessage(error.message || "Nao foi possivel solicitar replay.");
+    }
+  }, [clientSlug, selectedCamera?.id]);
+
   function saveChatUserName(name) {
     const safeName = name.trim() || STREAM_CHAT_USER;
     setChatUserName(safeName);
@@ -1692,6 +1779,21 @@ function StreamingPage({ clientSlug = "" }) {
       window.clearInterval(timer);
     };
   }, [clientSlug, selectedCameraId]);
+
+  useEffect(() => {
+    function handleReplayHotkey(event) {
+      const seconds = replaySecondsFromHotkey(event);
+      if (!seconds || event.repeat) {
+        return;
+      }
+
+      event.preventDefault();
+      requestReplayFromStreaming(seconds);
+    }
+
+    window.addEventListener("keydown", handleReplayHotkey);
+    return () => window.removeEventListener("keydown", handleReplayHotkey);
+  }, [requestReplayFromStreaming]);
 
   const isLive = webrtcStatus === "connected" || webrtcStatus === "receiving";
   const streamStatusLabel = isLive ? "Ao vivo" : "Offline";
@@ -2497,10 +2599,8 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
     camera_ip: "",
   });
   const [fieldForm, setFieldForm] = useState({
-    field_number: "1",
-    field_name: "Campo 1",
-    camera_number: "1",
-    camera_name: "Camera 1",
+    field_name: "",
+    camera_id: "",
     camera_ip: "",
   });
 
@@ -2570,10 +2670,8 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
 
   function resetFieldForm() {
     setFieldForm({
-      field_number: "1",
-      field_name: "Campo 1",
-      camera_number: "1",
-      camera_name: "Camera 1",
+      field_name: "",
+      camera_id: "",
       camera_ip: "",
     });
   }
@@ -2641,27 +2739,60 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
       return;
     }
 
-    const fieldNumberValue = Math.max(1, Number.parseInt(fieldForm.field_number, 10) || 1);
-    const cameraNumberValue = Math.max(1, Number.parseInt(fieldForm.camera_number, 10) || 1);
-    const fieldId = String(fieldNumberValue).padStart(2, "0");
-    const cameraId = String(cameraNumberValue).padStart(2, "0");
-    const fieldName = fieldForm.field_name.trim() || `Campo ${fieldNumberValue}`;
-    const cameraName = fieldForm.camera_name.trim() || `Camera ${cameraNumberValue}`;
+    const rawCameraId = fieldForm.camera_id.trim().toLowerCase();
+    const fieldName = fieldForm.field_name.trim();
+
+    if (!fieldName) {
+      setMessage("Informe o nome do campo.");
+      return;
+    }
+
+    if (!rawCameraId) {
+      setMessage("Informe o ID da camera.");
+      return;
+    }
+
+    const canonicalMatch = rawCameraId.match(/^campo-?(\d+)-(?:camera|cam)-?(\d+)$/i);
+    let fieldNumberValue = 0;
+    let cameraNumberValue = 0;
+
+    if (canonicalMatch) {
+      fieldNumberValue = Number(canonicalMatch[1]);
+      cameraNumberValue = Number(canonicalMatch[2]);
+    } else {
+      const cameraDigits = rawCameraId.match(/\d+/);
+      cameraNumberValue = Number(cameraDigits?.[0] || 1);
+      const fieldMatchByName = fieldName.match(/campo\s*0?(\d+)/i);
+      if (fieldMatchByName) {
+        fieldNumberValue = Number(fieldMatchByName[1]);
+      } else {
+        const usedFieldNumbers = cameras
+          .map((camera) => Number(parseCameraIdentity(camera)?.fieldId || 0))
+          .filter((value) => Number.isFinite(value) && value > 0);
+        fieldNumberValue = (usedFieldNumbers.length ? Math.max(...usedFieldNumbers) : 0) + 1;
+      }
+    }
+
+    fieldNumberValue = Math.max(1, fieldNumberValue || 1);
+    cameraNumberValue = Math.max(1, cameraNumberValue || 1);
+    const cameraBackendId = `campo-${String(fieldNumberValue).padStart(2, "0")}-camera-${String(cameraNumberValue).padStart(2, "0")}`;
+    const cameraName = `Camera ${cameraNumberValue}`;
+
     const payload = {
-      id: `campo-${fieldId}-camera-${cameraId}`,
+      id: cameraBackendId,
       name: `${fieldName} - ${cameraName}`,
       camera_ip: fieldForm.camera_ip.trim(),
     };
 
     setBusy(true);
-    setMessage(`Criando ${fieldName} com ${cameraName}...`);
+    setMessage(`Salvando ${fieldName} com ${cameraName}...`);
     try {
       const saved = await apiRequest("/admin/cameras", {
         method: "POST",
         bearerToken: token,
         body: JSON.stringify(payload),
       });
-      setMessage(`${fieldName} criado com a camera ${saved.name}.`);
+      setMessage(`${fieldName} atualizado com a camera ${saved.name}.`);
       resetFieldForm();
       await reloadAdminData();
     } catch (error) {
@@ -2829,62 +2960,40 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
             <article className="tenant-admin-card tenant-admin-form-card" id="criar-campo">
               <div className="tenant-admin-section-head">
                 <div>
-                  <h2>Criar campo</h2>
-                  <p>Crie o campo e vincule a primeira camera em um passo.</p>
+                  <h2>Configurar campo</h2>
+                  <p>Campos padrao ja existem. Edite e selecione a camera que sera usada.</p>
                 </div>
               </div>
               <form className="tenant-admin-form" onSubmit={saveTenantFieldCamera}>
-                <div className="tenant-admin-form-grid">
-                  <label htmlFor="tenantFieldNumber">Numero do campo</label>
-                  <input
-                    id="tenantFieldNumber"
-                    min="1"
-                    type="number"
-                    value={fieldForm.field_number}
-                    onChange={(event) => updateFieldForm("field_number", event.target.value)}
-                    required
-                  />
+                <label htmlFor="tenantFieldName">Nome do campo</label>
+                <input
+                  id="tenantFieldName"
+                  value={fieldForm.field_name}
+                  onChange={(event) => updateFieldForm("field_name", event.target.value)}
+                  placeholder="Campo 1"
+                  required
+                />
 
-                  <label htmlFor="tenantFieldName">Nome do campo</label>
-                  <input
-                    id="tenantFieldName"
-                    value={fieldForm.field_name}
-                    onChange={(event) => updateFieldForm("field_name", event.target.value)}
-                    placeholder="Campo 1"
-                    required
-                  />
+                <label htmlFor="tenantCameraShortId">ID da camera</label>
+                <input
+                  id="tenantCameraShortId"
+                  value={fieldForm.camera_id}
+                  onChange={(event) => updateFieldForm("camera_id", event.target.value)}
+                  placeholder="1 ou campo-01-camera-01"
+                  required
+                />
 
-                  <label htmlFor="tenantFieldCameraNumber">Numero da camera</label>
-                  <input
-                    id="tenantFieldCameraNumber"
-                    min="1"
-                    type="number"
-                    value={fieldForm.camera_number}
-                    onChange={(event) => updateFieldForm("camera_number", event.target.value)}
-                    required
-                  />
-
-                  <label htmlFor="tenantFieldCameraName">Nome da camera</label>
-                  <input
-                    id="tenantFieldCameraName"
-                    value={fieldForm.camera_name}
-                    onChange={(event) => updateFieldForm("camera_name", event.target.value)}
-                    placeholder="Camera 1"
-                    required
-                  />
-                </div>
-
-                <label htmlFor="tenantFieldCameraIp">IP ou RTSP da camera</label>
+                <label htmlFor="tenantFieldCameraIp">RTSP da camera</label>
                 <input
                   id="tenantFieldCameraIp"
                   value={fieldForm.camera_ip}
                   onChange={(event) => updateFieldForm("camera_ip", event.target.value)}
-                  placeholder="10.0.0.142:8554 ou rtsp://10.0.0.142:8554/ronaldinho-demo"
+                  placeholder="rtsp://127.0.0.1:8554/ronaldinho-demo"
                   required
                 />
 
                 <div className="tenant-admin-form-actions">
-                  <button className="tenant-admin-primary" type="submit" disabled={busy}>{busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />} Criar campo</button>
+                  <button className="tenant-admin-primary" type="submit" disabled={busy}>{busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />} Salvar campo</button>
                 </div>
               </form>
             </article>
@@ -3003,6 +3112,9 @@ function SuperAdminPage() {
     admin_email: "",
     admin_password: "",
     is_active: true,
+    initial_field_name: "",
+    initial_camera_number: "1",
+    initial_camera_ip: "",
   });
 
   const activeClients = clients.filter((client) => client.is_active).length;
@@ -3127,6 +3239,9 @@ function SuperAdminPage() {
       admin_email: "",
       admin_password: "",
       is_active: true,
+      initial_field_name: "",
+      initial_camera_number: "1",
+      initial_camera_ip: "",
     });
     setCep("");
     setCepStatus("");
@@ -3477,6 +3592,15 @@ function SuperAdminPage() {
                 <label>Nome do admin<input value={form.admin_name} onChange={(event) => updateForm("admin_name", event.target.value)} required /></label>
                 <label>Usuario do cliente<input value={form.admin_email} onChange={(event) => updateForm("admin_email", event.target.value)} placeholder="email de login" type="email" required /></label>
                 <label>Senha do cliente<input value={form.admin_password} onChange={(event) => updateForm("admin_password", event.target.value)} placeholder="senha inicial" type="text" required /></label>
+              </div>
+              <div className="super-admin-form-section">
+                <strong>Campo inicial do cliente</strong>
+                <span>Cria o primeiro campo e a camera que aparecera na Home do atleta.</span>
+              </div>
+              <div className="super-admin-form-grid">
+                <label>Nome do campo<input value={form.initial_field_name} onChange={(event) => updateForm("initial_field_name", event.target.value)} placeholder="Ex: Campo principal" /></label>
+                <label>Qual camera<select value={form.initial_camera_number} onChange={(event) => updateForm("initial_camera_number", event.target.value)}><option value="1">Camera 1</option><option value="2">Camera 2</option><option value="3">Camera 3</option><option value="4">Camera 4</option></select></label>
+                <label className="is-wide">IP ou RTSP da camera<input value={form.initial_camera_ip} onChange={(event) => updateForm("initial_camera_ip", event.target.value)} placeholder="10.0.0.142:8554 ou rtsp://10.0.0.142:8554/camera" /></label>
               </div>
               <div className="super-admin-form-footer">
                 <label className="super-admin-check"><input checked={form.is_active} onChange={(event) => updateForm("is_active", event.target.checked)} type="checkbox" /> Cliente ativo</label>
