@@ -36,6 +36,10 @@ def _run_lightweight_migrations() -> None:
             connection.execute(text("ALTER TABLE system_logs ADD COLUMN IF NOT EXISTS client_id VARCHAR(64) NOT NULL DEFAULT 'arena-society-custodia'"))
             connection.execute(text("ALTER TABLE replay_requests ADD COLUMN IF NOT EXISTS client_id VARCHAR(64) NOT NULL DEFAULT 'arena-society-custodia'"))
             connection.execute(text("ALTER TABLE replay_events ADD COLUMN IF NOT EXISTS client_id VARCHAR(64) NOT NULL DEFAULT 'arena-society-custodia'"))
+            connection.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS company_email VARCHAR(180)"))
+            connection.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS company_phone VARCHAR(40)"))
+            connection.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS document VARCHAR(80)"))
+            connection.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS address VARCHAR(500)"))
         logger.info("Migracao verificada: cameras.rtsp_url.")
         return
 
@@ -52,6 +56,7 @@ def _run_lightweight_migrations() -> None:
         log_columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(system_logs)").fetchall()}
         request_columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(replay_requests)").fetchall()}
         event_columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(replay_events)").fetchall()}
+        client_columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(clients)").fetchall()}
 
         if "status" not in camera_columns:
             connection.execute(
@@ -102,6 +107,15 @@ def _run_lightweight_migrations() -> None:
 
         if "client_id" not in event_columns:
             connection.execute(text("ALTER TABLE replay_events ADD COLUMN client_id VARCHAR(64) NOT NULL DEFAULT 'arena-society-custodia'"))
+
+        for column_name, column_type in (
+            ("company_email", "VARCHAR(180)"),
+            ("company_phone", "VARCHAR(40)"),
+            ("document", "VARCHAR(80)"),
+            ("address", "VARCHAR(500)"),
+        ):
+            if column_name not in client_columns:
+                connection.execute(text(f"ALTER TABLE clients ADD COLUMN {column_name} {column_type}"))
 
 
 def _seed_demo_tenants() -> None:

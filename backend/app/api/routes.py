@@ -4,7 +4,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
@@ -14,10 +14,13 @@ from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.sanitize import truncate_text
 from app.core.security import create_access_token, decode_access_token, verify_password
+from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.chat import ChatMessage
+from app.models.camera import CameraConfig
 from app.models.client import Client
 from app.models.event import ReplayEvent
+from app.models.replay import Replay
 from app.models.replay_request import ReplayRequestQueue
 from app.models.system_log import SystemLog
 from app.models.user import User
@@ -54,6 +57,36 @@ class TenantContext(BaseModel):
     role: str = "public"
 
 
+class SuperAdminClientPayload(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    slug: str = Field(min_length=1, max_length=120, pattern=r"^[a-zA-Z0-9_-]+$")
+    plan: str = Field(default="starter", max_length=40)
+    logo_url: str | None = Field(default="/assets/logo-sertao-replay-nav.png", max_length=500)
+    company_email: str | None = Field(default=None, max_length=180)
+    company_phone: str | None = Field(default=None, max_length=40)
+    document: str | None = Field(default=None, max_length=80)
+    address: str | None = Field(default=None, max_length=500)
+    admin_name: str = Field(min_length=1, max_length=120)
+    admin_email: str = Field(min_length=3, max_length=180)
+    admin_password: str = Field(min_length=6, max_length=200)
+    is_active: bool = True
+
+
+class SuperAdminClientUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    slug: str | None = Field(default=None, min_length=1, max_length=120, pattern=r"^[a-zA-Z0-9_-]+$")
+    plan: str | None = Field(default=None, max_length=40)
+    logo_url: str | None = Field(default=None, max_length=500)
+    company_email: str | None = Field(default=None, max_length=180)
+    company_phone: str | None = Field(default=None, max_length=40)
+    document: str | None = Field(default=None, max_length=80)
+    address: str | None = Field(default=None, max_length=500)
+    admin_name: str | None = Field(default=None, min_length=1, max_length=120)
+    admin_email: str | None = Field(default=None, min_length=3, max_length=180)
+    admin_password: str | None = Field(default=None, min_length=6, max_length=200)
+    is_active: bool | None = None
+
+
 def require_operator(
     request: Request,
     x_operator_token: str | None = Header(default=None),
@@ -80,8 +113,35 @@ def _client_response(record: Client) -> dict[str, object]:
         "slug": record.slug,
         "logo_url": record.logo_url,
         "plan": record.plan,
+        "company_email": record.company_email,
+        "company_phone": record.company_phone,
+        "document": record.document,
+        "address": record.address,
         "is_active": record.is_active,
         "created_at": record.created_at.isoformat(),
+    }
+
+
+def _client_admin_response(db: Session, record: Client) -> dict[str, object]:
+    cameras_total = db.query(CameraConfig).filter(CameraConfig.client_id == record.id).count()
+    replays_total = db.query(Replay).filter(Replay.client_id == record.id).count()
+    users = db.query(User).filter(User.client_id == record.id).order_by(User.created_at.desc()).all()
+    return {
+        **_client_response(record),
+        "admin_path": f"/admin/{record.slug}/dashboard",
+        "public_path": f"/{record.slug}",
+        "cameras_total": cameras_total,
+        "replays_total": replays_total,
+        "users": [
+            {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "role": user.role,
+                "created_at": user.created_at.isoformat(),
+            }
+            for user in users
+        ],
     }
 
 
@@ -331,6 +391,113 @@ def public_client_replay(slug: str, replay_id: int, db: Session = Depends(get_db
     if not replay:
         raise HTTPException(status_code=404, detail="Replay nao encontrado.")
     return replay
+
+
+@router.get("/super-admin/clients")
+def list_super_admin_clients(db: Session = Depends(get_db), _: None = Depends(require_operator)):
+    records = db.query(Client).order_by(Client.created_at.desc()).all()
+    return [_client_admin_response(db, record) for record in records]
+
+
+@router.get("/super-admin/clients/{client_id}")
+def get_super_admin_client(client_id: str, db: Session = Depends(get_db), _: None = Depends(require_operator)):
+    record = db.get(Client, client_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Cliente nao encontrado.")
+    return _client_admin_response(db, record)
+
+
+@router.post("/super-admin/clients")
+def create_super_admin_client(payload: SuperAdminClientPayload, db: Session = Depends(get_db), _: None = Depends(require_operator)):
+    client_id = payload.slug.strip().lower()
+    if db.get(Client, client_id) or db.query(Client).filter(Client.slug == payload.slug).first():
+        raise HTTPException(status_code=400, detail="Cliente ou slug ja cadastrado.")
+    if db.query(User).filter(User.email == payload.admin_email.strip().lower()).first():
+        raise HTTPException(status_code=400, detail="Email admin ja cadastrado.")
+
+    client = Client(
+        id=client_id,
+        name=payload.name.strip(),
+        slug=payload.slug.strip().lower(),
+        logo_url=payload.logo_url,
+        plan=payload.plan.strip() or "starter",
+        company_email=(payload.company_email or "").strip() or None,
+        company_phone=(payload.company_phone or "").strip() or None,
+        document=(payload.document or "").strip() or None,
+        address=(payload.address or "").strip() or None,
+        is_active=payload.is_active,
+    )
+    db.add(client)
+    db.add(
+        User(
+            id=f"admin-{client_id}",
+            client_id=client.id,
+            name=payload.admin_name.strip(),
+            email=payload.admin_email.strip().lower(),
+            password_hash=hash_password(payload.admin_password),
+            role="admin",
+        )
+    )
+    db.commit()
+    db.refresh(client)
+    return _client_admin_response(db, client)
+
+
+@router.patch("/super-admin/clients/{client_id}")
+def update_super_admin_client(
+    client_id: str,
+    payload: SuperAdminClientUpdate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
+    client = db.get(Client, client_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente nao encontrado.")
+
+    if payload.slug and payload.slug != client.slug and db.query(Client).filter(Client.slug == payload.slug).first():
+        raise HTTPException(status_code=400, detail="Slug ja cadastrado.")
+
+    for field_name in ("name", "slug", "plan", "logo_url", "company_email", "company_phone", "document", "address", "is_active"):
+        value = getattr(payload, field_name)
+        if value is not None:
+            setattr(client, field_name, value.strip() if isinstance(value, str) else value)
+
+    admin = db.query(User).filter(User.client_id == client.id).order_by(User.created_at.asc()).first()
+    if payload.admin_email:
+        email = payload.admin_email.strip().lower()
+        existing = db.query(User).filter(User.email == email, User.client_id != client.id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email admin ja cadastrado.")
+        if admin:
+            admin.email = email
+    if payload.admin_name and admin:
+        admin.name = payload.admin_name.strip()
+    if payload.admin_password and admin:
+        admin.password_hash = hash_password(payload.admin_password)
+
+    db.commit()
+    db.refresh(client)
+    return _client_admin_response(db, client)
+
+
+@router.delete("/super-admin/clients/{client_id}")
+def delete_super_admin_client(
+    client_id: str,
+    force: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
+    client = db.get(Client, client_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente nao encontrado.")
+    if client.id == _default_client_id() and not force:
+        raise HTTPException(status_code=400, detail="Cliente padrao nao pode ser excluido sem force=true.")
+
+    for model in (ReplayRequestQueue, ReplayEvent, ChatMessage, SystemLog, CameraConfig, Replay, User):
+        db.query(model).filter(model.client_id == client.id).delete(synchronize_session=False)
+    db.delete(client)
+    db.commit()
+    return {"ok": True, "client_id": client_id}
 
 
 @router.get("/cameras/{camera_id}/hls/{asset_path:path}")

@@ -1,8 +1,12 @@
 ﻿import {
   Activity,
+  Ban,
+  Building2,
   Camera,
   CheckCircle2,
+  CreditCard,
   Download,
+  ExternalLink,
   Eye,
   EyeOff,
   FileText,
@@ -19,7 +23,9 @@
   Send,
   Settings,
   ShieldCheck,
+  Trash2,
   TrendingUp,
+  UserPlus,
   UserRound,
   Users,
   Video,
@@ -2663,6 +2669,282 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
   );
 }
 
+function SuperAdminPage() {
+  const [token, setToken] = useState(() => localStorage.getItem(OPERATOR_TOKEN_KEY) || "");
+  const [clients, setClients] = useState([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [message, setMessage] = useState("Informe o token e carregue os clientes.");
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    slug: "",
+    plan: "pro",
+    company_email: "",
+    company_phone: "",
+    document: "",
+    address: "",
+    admin_name: "",
+    admin_email: "",
+    admin_password: "",
+    is_active: true,
+  });
+
+  const activeClients = clients.filter((client) => client.is_active).length;
+  const inactiveClients = clients.length - activeClients;
+  const totalCameras = clients.reduce((total, client) => total + Number(client.cameras_total || 0), 0);
+  const totalReplays = clients.reduce((total, client) => total + Number(client.replays_total || 0), 0);
+
+  function tokenValue() {
+    return token.trim();
+  }
+
+  function superAdminOptions(options = {}) {
+    return tokenValue() ? { ...options, token: tokenValue() } : options;
+  }
+
+  function updateForm(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function resetForm() {
+    setForm({
+      name: "",
+      slug: "",
+      plan: "pro",
+      company_email: "",
+      company_phone: "",
+      document: "",
+      address: "",
+      admin_name: "",
+      admin_email: "",
+      admin_password: "",
+      is_active: true,
+    });
+  }
+
+  async function loadClients(nextSelectedId = selectedId) {
+    setBusy(true);
+    try {
+      const data = await apiRequest("/super-admin/clients", superAdminOptions());
+      const records = Array.isArray(data) ? data : [];
+      setClients(records);
+      const next = records.find((client) => client.id === nextSelectedId) || records[0] || null;
+      setSelectedId(next?.id || "");
+      setSelectedClient(next);
+      localStorage.setItem(OPERATOR_TOKEN_KEY, tokenValue());
+      setMessage("Clientes carregados.");
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openClient(clientId) {
+    setSelectedId(clientId);
+    setBusy(true);
+    try {
+      const data = await apiRequest(`/super-admin/clients/${encodeURIComponent(clientId)}`, superAdminOptions());
+      setSelectedClient(data);
+      setMessage(`Cliente ${data.name} selecionado.`);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitClient(event) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const payload = {
+        ...form,
+        slug: form.slug.trim().toLowerCase(),
+        logo_url: "/assets/logo-sertao-replay-nav.png",
+      };
+      const saved = await apiRequest("/super-admin/clients", superAdminOptions({
+        method: "POST",
+        body: JSON.stringify(payload),
+      }));
+      resetForm();
+      setMessage(`Cliente ${saved.name} criado. Login: ${payload.admin_email}`);
+      await loadClients(saved.id);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleClient(client) {
+    setBusy(true);
+    try {
+      const saved = await apiRequest(`/super-admin/clients/${encodeURIComponent(client.id)}`, superAdminOptions({
+        method: "PATCH",
+        body: JSON.stringify({ is_active: !client.is_active }),
+      }));
+      setMessage(saved.is_active ? "Cliente ativado." : "Cliente desativado.");
+      await loadClients(saved.id);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteClient(client) {
+    if (!window.confirm(`Excluir o cliente ${client.name}? Esta acao remove usuarios, cameras, replays e logs dele.`)) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await apiRequest(`/super-admin/clients/${encodeURIComponent(client.id)}?force=true`, superAdminOptions({ method: "DELETE" }));
+      setMessage(`Cliente ${client.name} excluido.`);
+      await loadClients("");
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="super-admin-page">
+      <header className="super-admin-topbar">
+        <div className="super-admin-brand">
+          <Menu size={22} />
+          <img alt="Sertao Replay" src="/assets/logo-sertao-replay-nav.png" />
+          <span>Super Admin</span>
+        </div>
+        <nav className="super-admin-nav" aria-label="Super admin">
+          <a href="#dashboard">Dashboard</a>
+          <a href="#clientes">Clientes</a>
+          <a href="#novo-cliente">Novo cliente</a>
+          <a href="#seguranca">Seguranca</a>
+        </nav>
+        <button className="super-admin-avatar" type="button" title="Super admin">SA</button>
+      </header>
+
+      <section className="super-admin-shell" id="dashboard">
+        <div className="super-admin-heading">
+          <div>
+            <h1>Super Admin Dashboard</h1>
+            <p>Status do sistema: <strong>otimizado</strong></p>
+          </div>
+          <div className="super-admin-token">
+            <input value={token} onChange={(event) => setToken(event.target.value)} placeholder="Token de operador" type="password" />
+            <button onClick={() => loadClients()} disabled={busy} type="button">{busy ? <Loader2 className="spin" size={18} /> : <RotateCcw size={18} />} Carregar</button>
+          </div>
+        </div>
+
+        {message ? <div className="super-admin-message">{message}</div> : null}
+
+        <section className="super-admin-stats">
+          <article className="super-admin-card">
+            <div><CreditCard size={24} /><span>+12.5%</span></div>
+            <h2>Receita estimada</h2>
+            <strong>R$ 142.850,00</strong>
+            <i style={{ width: "75%" }} />
+          </article>
+          <article className="super-admin-card is-featured">
+            <div><Users size={24} /><span>{activeClients} ativos</span></div>
+            <h2>Clientes cadastrados</h2>
+            <strong>{clients.length}</strong>
+            <p>{inactiveClients} inativos</p>
+          </article>
+          <article className="super-admin-card">
+            <div><Video size={24} /><span>{totalCameras} cameras</span></div>
+            <h2>Replays / estrutura</h2>
+            <strong>{totalReplays}</strong>
+            <p>Replays nos tenants</p>
+          </article>
+        </section>
+
+        <section className="super-admin-grid">
+          <section className="super-admin-main">
+            <div className="super-admin-section-title" id="novo-cliente">
+              <h2><UserPlus size={24} /> Criar cliente e login</h2>
+            </div>
+
+            <form className="super-admin-form super-admin-card" onSubmit={submitClient}>
+              <div className="super-admin-form-grid">
+                <label>Nome da empresa<input value={form.name} onChange={(event) => updateForm("name", event.target.value)} required /></label>
+                <label>Slug publico<input value={form.slug} onChange={(event) => updateForm("slug", event.target.value)} placeholder="arena-exemplo" required /></label>
+                <label>Plano<input value={form.plan} onChange={(event) => updateForm("plan", event.target.value)} /></label>
+                <label>Email da empresa<input value={form.company_email} onChange={(event) => updateForm("company_email", event.target.value)} type="email" /></label>
+                <label>Telefone<input value={form.company_phone} onChange={(event) => updateForm("company_phone", event.target.value)} /></label>
+                <label>CNPJ / documento<input value={form.document} onChange={(event) => updateForm("document", event.target.value)} /></label>
+                <label className="is-wide">Endereco<input value={form.address} onChange={(event) => updateForm("address", event.target.value)} /></label>
+                <label>Nome do admin<input value={form.admin_name} onChange={(event) => updateForm("admin_name", event.target.value)} required /></label>
+                <label>Email de login<input value={form.admin_email} onChange={(event) => updateForm("admin_email", event.target.value)} type="email" required /></label>
+                <label>Senha inicial<input value={form.admin_password} onChange={(event) => updateForm("admin_password", event.target.value)} type="password" required /></label>
+              </div>
+              <label className="super-admin-check"><input checked={form.is_active} onChange={(event) => updateForm("is_active", event.target.checked)} type="checkbox" /> Cliente ativo</label>
+              <button className="super-admin-primary" disabled={busy} type="submit">{busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />} Criar cliente</button>
+            </form>
+
+            <div className="super-admin-section-title" id="clientes">
+              <h2><Building2 size={24} /> Clientes</h2>
+              <button onClick={() => loadClients()} type="button">Atualizar</button>
+            </div>
+            <div className="super-admin-client-list">
+              {clients.map((client) => (
+                <button className={`super-admin-client-row ${selectedId === client.id ? "is-active" : ""}`} onClick={() => openClient(client.id)} type="button" key={client.id}>
+                  <span><strong>{client.name}</strong><small>/{client.slug} · {client.users?.[0]?.email || "sem login"}</small></span>
+                  <em className={client.is_active ? "is-active" : "is-inactive"}>{client.is_active ? "ativo" : "inativo"}</em>
+                </button>
+              ))}
+              {!clients.length ? <div className="super-admin-empty">Nenhum cliente carregado.</div> : null}
+            </div>
+          </section>
+
+          <aside className="super-admin-sidebar">
+            <article className="super-admin-card">
+              <h2><ShieldCheck size={24} /> Acesso do cliente</h2>
+              {selectedClient ? (
+                <div className="super-admin-detail">
+                  <strong>{selectedClient.name}</strong>
+                  <span>{selectedClient.company_email || "Email da empresa nao informado"}</span>
+                  <span>{selectedClient.company_phone || "Telefone nao informado"}</span>
+                  <span>{selectedClient.document || "Documento nao informado"}</span>
+                  <span>{selectedClient.address || "Endereco nao informado"}</span>
+                  <a href={selectedClient.admin_path} target="_blank" rel="noreferrer"><ExternalLink size={17} /> Admin: {selectedClient.admin_path}</a>
+                  <a href={selectedClient.public_path} target="_blank" rel="noreferrer"><ExternalLink size={17} /> Publico: {selectedClient.public_path}</a>
+                  <div className="super-admin-detail-grid">
+                    <div><b>{selectedClient.cameras_total}</b><small>Cameras</small></div>
+                    <div><b>{selectedClient.replays_total}</b><small>Replays</small></div>
+                  </div>
+                  <div className="super-admin-user-list">
+                    {(selectedClient.users || []).map((user) => (
+                      <p key={user.id}><strong>{user.name}</strong><span>{user.email}</span></p>
+                    ))}
+                  </div>
+                  <button className="super-admin-secondary" onClick={() => toggleClient(selectedClient)} type="button">
+                    <Ban size={18} /> {selectedClient.is_active ? "Desativar cliente" : "Ativar cliente"}
+                  </button>
+                  <button className="super-admin-danger" onClick={() => deleteClient(selectedClient)} type="button">
+                    <Trash2 size={18} /> Excluir cliente
+                  </button>
+                </div>
+              ) : <p>Selecione um cliente para ver todos os detalhes.</p>}
+            </article>
+
+            <article className="super-admin-card" id="seguranca">
+              <h2><Settings size={24} /> Seguranca</h2>
+              <div className="super-admin-security-row"><span>2FA obrigatorio</span><input type="checkbox" checked readOnly /></div>
+              <div className="super-admin-security-row"><span>Monitoramento da API</span><input type="checkbox" checked readOnly /></div>
+              <div className="super-admin-security-row"><span>Restricao por pais</span><input type="checkbox" readOnly /></div>
+            </article>
+          </aside>
+        </section>
+      </section>
+    </main>
+  );
+}
+
 function AdminPage() {
   const [token, setToken] = useState(() => localStorage.getItem(OPERATOR_TOKEN_KEY) || "");
   const [cameras, setCameras] = useState([]);
@@ -3028,6 +3310,10 @@ export default function App() {
   const tenantMatch = window.location.pathname.match(/^\/a\/([^/]+)\/?$/);
   const cameraRouteMatch = window.location.pathname.match(/^\/campo(\d+)\/camera(\d+)\/?$/);
   const fieldMatch = window.location.pathname.match(/^\/campo(\d+)\/?$/);
+
+  if (window.location.pathname.startsWith("/super-admin")) {
+    return <SuperAdminPage />;
+  }
 
   if (
     tenantAdminMatch
