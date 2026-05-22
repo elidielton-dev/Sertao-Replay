@@ -61,6 +61,21 @@ const REPLAY_HOTKEY_SECONDS = {
 };
 const NEXT_CAMERA_HOTKEY = "F17";
 
+function replaySecondsFromHotkey(event) {
+  if (event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey) {
+    if (event.key === "1") return 10;
+    if (event.key === "2") return 15;
+    if (event.key === "3") return 30;
+    if (event.key.toLowerCase() === "r") return 15;
+  }
+
+  return REPLAY_HOTKEY_SECONDS[event.key] || 0;
+}
+
+function isNextCameraHotkey(event) {
+  return event.key === NEXT_CAMERA_HOTKEY || (event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey && event.key.toLowerCase() === "n");
+}
+
 function generateClientPassword() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
   let password = "SR-";
@@ -256,6 +271,8 @@ const cameras = [
 
 function parseCameraIdentity(camera, index = 0) {
   const id = String(camera?.id || "");
+  const slug = String(camera?.slug || "");
+  const source = `${id} ${slug} ${camera?.name || ""}`;
   const idMatch = id.match(/^campo-?(\d+)(?:-(?:camera|cam)-?(\d+))?$/i);
   if (idMatch) {
     return {
@@ -264,15 +281,15 @@ function parseCameraIdentity(camera, index = 0) {
     };
   }
 
-  const fieldNameMatch = String(camera?.name || "").match(/campo\s*0?(\d+)/i);
+  const fieldNameMatch = source.match(/campo\s*-?\s*0?(\d+)/i);
   if (!fieldNameMatch) {
     return null;
   }
 
-  const cameraNameMatch = String(camera?.name || "").match(/c[aÃ¢]mera\s*0?(\d+)/i);
+  const cameraNameMatch = source.match(/c[aÃ¢]mera\s*-?\s*0?(\d+)|camera\s*-?\s*0?(\d+)|cam\s*-?\s*0?(\d+)/i);
   return {
     fieldId: String(Number(fieldNameMatch[1])),
-    cameraId: String(Number(cameraNameMatch?.[1] || index + 1)),
+    cameraId: String(Number(cameraNameMatch?.[1] || cameraNameMatch?.[2] || cameraNameMatch?.[3] || index + 1)),
   };
 }
 
@@ -297,7 +314,7 @@ function buildRegisteredFields(apiCameras = [], clientSlug = "") {
         backendId: camera.id,
         id: identity.cameraId,
         fieldId: identity.fieldId,
-        href: cameraRoute(identity.fieldId, identity.cameraId),
+        href: cameraRoute(identity.fieldId, identity.cameraId, clientSlug),
         image: template.image,
         name: camera.name || `CÃ¢mera ${identity.cameraId}`,
         position: camera.notes || template.position,
@@ -2183,13 +2200,13 @@ function OperatorPage() {
 
   useEffect(() => {
     function handleReplayHotkey(event) {
-      if (event.key === NEXT_CAMERA_HOTKEY && !event.repeat) {
+      if (isNextCameraHotkey(event) && !event.repeat) {
         event.preventDefault();
         selectNextCamera();
         return;
       }
 
-      const seconds = REPLAY_HOTKEY_SECONDS[event.key];
+      const seconds = replaySecondsFromHotkey(event);
       if (!seconds || event.repeat) {
         return;
       }

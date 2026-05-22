@@ -13,7 +13,7 @@ from pathlib import Path
 from tkinter import StringVar, messagebox
 
 import customtkinter as ctk
-from PIL import Image
+from PIL import Image, ImageOps
 import requests
 
 
@@ -244,7 +244,8 @@ class StepWindow(ctk.CTk):
         if not path.exists():
             return None
         image = Image.open(path)
-        return ctk.CTkImage(light_image=image, dark_image=image, size=(226, 48))
+        fitted = ImageOps.contain(image, (226, 56), Image.Resampling.LANCZOS)
+        return ctk.CTkImage(light_image=fitted, dark_image=fitted, size=fitted.size)
 
     def header(self) -> None:
         top = ctk.CTkFrame(self, fg_color=SURFACE, corner_radius=0, border_color=LINE, border_width=1, height=78)
