@@ -65,7 +65,8 @@ class CameraService:
                 raise ValueError("Camera pertence a outro cliente.")
             record.name = camera.name
             record.slug = camera.slug or camera.id
-            record.rtsp_url = camera.rtsp_url
+            if camera.rtsp_url is not None:
+                record.rtsp_url = camera.rtsp_url
             record.enabled = camera.enabled
             record.notes = camera.notes
             message = "Camera atualizada no banco de dados."
