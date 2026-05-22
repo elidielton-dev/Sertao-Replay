@@ -2187,8 +2187,8 @@ function OperatorPage() {
 }
 
 function AdminLoginPage() {
-  const [email, setEmail] = useState("admin@mvp.test");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
