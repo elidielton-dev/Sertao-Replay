@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Anybody:wght@300;400;600;700;800&family=Inter:wght@400;600;700;800;900&family=Montserrat:wght@800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Anybody:wght@300;400;600;700;800&family=Hanken+Grotesk:wght@400;500;600&family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500&family=Montserrat:wght@800;900&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -256,6 +256,1079 @@ h1 {
   background: #9fe870;
   font-weight: 900;
   text-decoration: none;
+}
+
+.admin-login-page {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  overflow: hidden;
+  padding: 32px 16px;
+  color: #e0e3e0;
+  background:
+    radial-gradient(circle at 50% 44%, #1a2a10 0%, #101413 70%),
+    #101413;
+  font-family: "Hanken Grotesk", Inter, Arial, sans-serif;
+}
+
+.admin-login-lights,
+.admin-login-texture {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.admin-login-lights::before {
+  content: "";
+  position: absolute;
+  top: -120px;
+  left: 50%;
+  width: min(820px, 150vw);
+  height: 420px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, rgba(141, 220, 0, 0.15) 0%, transparent 70%);
+}
+
+.admin-login-texture {
+  opacity: 0.03;
+  background-image:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.7) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.7) 1px, transparent 1px);
+  background-position:
+    0 0,
+    0 10px;
+  background-size: 20px 20px;
+}
+
+.admin-login-shell {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 100%);
+  animation: admin-login-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.admin-login-brand {
+  display: grid;
+  justify-items: center;
+  gap: 28px;
+  margin-bottom: 46px;
+  text-align: center;
+}
+
+.admin-login-logo {
+  width: min(320px, 72vw);
+  filter: drop-shadow(0 0 15px rgba(141, 220, 0, 0.3));
+}
+
+.admin-login-title h1 {
+  margin: 0 0 8px;
+  color: #a1fb00;
+  font-family: Anybody, Inter, sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.3;
+}
+
+.admin-login-title p,
+.admin-login-field label,
+.admin-login-label-row a,
+.admin-login-security,
+.admin-login-status {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.admin-login-title p {
+  margin: 0;
+  color: #c0caad;
+  letter-spacing: 0.16em;
+}
+
+.admin-login-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(141, 220, 0, 0.2);
+  border-radius: 12px;
+  padding: 32px;
+  background: rgba(28, 32, 31, 0.7);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(20px);
+  transition:
+    border-color 0.5s ease,
+    box-shadow 0.5s ease;
+}
+
+.admin-login-card:hover {
+  border-color: rgba(141, 220, 0, 0.4);
+}
+
+.admin-login-accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #8ddc00, transparent);
+  opacity: 0.5;
+}
+
+.admin-login-form {
+  display: grid;
+  gap: 32px;
+}
+
+.admin-login-field {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-login-field label {
+  color: #c0caad;
+  transition: color 0.2s ease;
+}
+
+.admin-login-field:focus-within label {
+  color: #8ddc00;
+}
+
+.admin-login-label-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-login-label-row a {
+  color: #8ddc00;
+  text-decoration: none;
+  text-transform: none;
+}
+
+.admin-login-label-row a:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.admin-login-input-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #414a34;
+  color: rgba(192, 202, 173, 0.5);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease;
+}
+
+.admin-login-input-row:focus-within {
+  border-bottom-color: #8ddc00;
+  color: #8ddc00;
+  box-shadow: 0 4px 12px -4px rgba(141, 220, 0, 0.4);
+}
+
+.admin-login-input-row input {
+  min-height: 48px;
+  width: 100%;
+  border: 0;
+  padding: 12px 0;
+  color: #ffffff;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1.5;
+  outline: none;
+}
+
+.admin-login-input-row input::placeholder {
+  color: rgba(192, 202, 173, 0.5);
+}
+
+.admin-login-visibility {
+  display: grid;
+  min-height: 44px;
+  width: 44px;
+  place-items: center;
+  border: 0;
+  color: rgba(192, 202, 173, 0.55);
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.admin-login-visibility:hover {
+  color: #ffffff;
+}
+
+.admin-login-submit {
+  display: inline-flex;
+  min-height: 64px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 0;
+  border-radius: 999px;
+  padding: 16px 24px;
+  color: #102000;
+  background: #a1fb00;
+  font-family: Anybody, Inter, sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    box-shadow 0.2s ease,
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.admin-login-submit:hover {
+  box-shadow: 0 0 20px rgba(141, 220, 0, 0.4);
+}
+
+.admin-login-submit:active {
+  transform: scale(0.96);
+}
+
+.admin-login-submit:disabled {
+  cursor: wait;
+  opacity: 0.74;
+}
+
+.admin-login-security {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-top: 1px solid rgba(65, 74, 52, 0.3);
+  padding-top: 16px;
+  color: rgba(192, 202, 173, 0.6);
+  letter-spacing: 0;
+}
+
+.admin-login-message {
+  margin-top: 18px;
+  border: 1px solid rgba(141, 220, 0, 0.2);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #d0e9cb;
+  background: rgba(16, 20, 19, 0.72);
+  font-size: 14px;
+}
+
+.admin-login-message:not(.is-loading) {
+  border-color: rgba(255, 180, 171, 0.3);
+  color: #ffdad6;
+}
+
+.admin-login-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 48px;
+  padding: 0 8px;
+  color: rgba(192, 202, 173, 0.5);
+}
+
+.admin-login-status div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(141, 220, 0, 0.72);
+}
+
+.admin-login-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #8ddc00;
+  animation: admin-login-pulse 2s infinite;
+}
+
+@keyframes admin-login-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes admin-login-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-login-page {
+    padding: 24px 16px;
+    align-items: start;
+  }
+
+  .admin-login-brand {
+    gap: 22px;
+    margin-bottom: 32px;
+  }
+
+  .admin-login-card {
+    padding: 24px;
+  }
+
+  .admin-login-submit {
+    min-height: 58px;
+    font-size: 20px;
+  }
+
+  .admin-login-label-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .admin-login-status {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-top: 32px;
+  }
+}
+
+.tenant-admin-page {
+  min-height: 100vh;
+  padding-bottom: 96px;
+  color: #e0e3e0;
+  background: radial-gradient(circle at center, #1a2414 0%, #101413 100%);
+  font-family: "Hanken Grotesk", Inter, Arial, sans-serif;
+}
+
+.tenant-admin-topbar {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: 100%;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(16, 20, 19, 0.72);
+  box-shadow: 0 0 15px rgba(141, 220, 0, 0.1);
+  backdrop-filter: blur(18px);
+}
+
+.tenant-admin-topbar-inner {
+  display: flex;
+  width: min(1280px, 100%);
+  height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 auto;
+  padding: 0 48px;
+}
+
+.tenant-admin-brand,
+.tenant-admin-logo-link,
+.tenant-admin-desktop-nav,
+.tenant-admin-heading-actions {
+  display: flex;
+  align-items: center;
+}
+
+.tenant-admin-brand {
+  gap: 16px;
+}
+
+.tenant-admin-icon-button {
+  display: grid;
+  min-height: 44px;
+  width: 44px;
+  place-items: center;
+  border: 0;
+  color: #ffffff;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tenant-admin-logo-link {
+  gap: 8px;
+  color: #ffffff;
+  font-family: Anybody, Inter, sans-serif;
+  font-size: 24px;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-decoration: none;
+}
+
+.tenant-admin-logo-link img {
+  height: 40px;
+  width: auto;
+}
+
+.tenant-admin-desktop-nav {
+  gap: 32px;
+}
+
+.tenant-admin-desktop-nav a,
+.tenant-admin-heading span,
+.tenant-admin-primary,
+.tenant-admin-secondary,
+.tenant-admin-table th,
+.tenant-admin-card-top > span,
+.tenant-admin-chart-labels,
+.tenant-admin-bottom-nav span {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.tenant-admin-desktop-nav a {
+  color: #c0caad;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.tenant-admin-desktop-nav a:hover,
+.tenant-admin-desktop-nav a.is-active {
+  color: #ffffff;
+}
+
+.tenant-admin-avatar {
+  display: grid;
+  min-height: 44px;
+  width: 44px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  color: #102000;
+  background: #a1fb00;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tenant-admin-shell {
+  width: min(1280px, 100%);
+  margin: 0 auto;
+  padding: 96px 48px 128px;
+}
+
+.tenant-admin-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.tenant-admin-heading span {
+  color: #a1fb00;
+  letter-spacing: 0.2em;
+}
+
+.tenant-admin-heading h1 {
+  margin: 6px 0 0;
+  color: #ffffff;
+  font-family: Anybody, Inter, sans-serif;
+  font-size: clamp(2.5rem, 5vw, 3rem);
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-shadow: 0 0 10px rgba(141, 220, 0, 0.5);
+}
+
+.tenant-admin-heading p {
+  margin: 6px 0 0;
+  color: #c0caad;
+}
+
+.tenant-admin-heading-actions {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tenant-admin-primary,
+.tenant-admin-secondary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 24px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.tenant-admin-primary {
+  color: #102000;
+  background: #a1fb00;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.tenant-admin-primary:hover {
+  box-shadow: 0 0 15px rgba(141, 220, 0, 0.4);
+}
+
+.tenant-admin-primary:active,
+.tenant-admin-secondary:active {
+  transform: scale(0.96);
+}
+
+.tenant-admin-secondary {
+  border: 1px solid rgba(141, 220, 0, 0.35);
+  color: #a1fb00;
+  background: rgba(28, 32, 31, 0.7);
+}
+
+.tenant-admin-message {
+  margin-bottom: 20px;
+  border: 1px solid rgba(141, 220, 0, 0.2);
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: #d0e9cb;
+  background: rgba(28, 32, 31, 0.7);
+  backdrop-filter: blur(20px);
+}
+
+.tenant-admin-card {
+  border: 1px solid rgba(141, 220, 0, 0.2);
+  border-radius: 12px;
+  background: rgba(28, 32, 31, 0.7);
+  backdrop-filter: blur(20px);
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    transform 0.3s ease;
+}
+
+.tenant-admin-card:hover {
+  border-color: rgba(141, 220, 0, 0.5);
+  box-shadow: 0 0 20px rgba(141, 220, 0, 0.1);
+}
+
+.tenant-admin-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.tenant-admin-metrics .tenant-admin-card {
+  display: flex;
+  min-height: 160px;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px;
+}
+
+.tenant-admin-camera-card {
+  grid-column: span 2;
+}
+
+.tenant-admin-card-top,
+.tenant-admin-section-head,
+.tenant-admin-split-status,
+.tenant-admin-big-number,
+.tenant-admin-card p {
+  display: flex;
+  align-items: center;
+}
+
+.tenant-admin-card-top {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tenant-admin-card-top > span {
+  color: #c0caad;
+  text-align: right;
+}
+
+.tenant-admin-card-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 8px;
+  color: #a1fb00;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tenant-admin-big-number {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.tenant-admin-big-number strong {
+  color: #ffffff;
+  font-family: Anybody, Inter, sans-serif;
+  font-size: 48px;
+  line-height: 1;
+}
+
+.tenant-admin-big-number span {
+  color: #c0caad;
+}
+
+.tenant-admin-split-status {
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.tenant-admin-split-status span,
+.tenant-admin-card p {
+  gap: 8px;
+  margin: 0;
+  color: #a1fb00;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.tenant-admin-split-status span:last-child {
+  color: #ffb4ab;
+  opacity: 0.68;
+}
+
+.tenant-admin-split-status i,
+.tenant-admin-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.tenant-admin-split-status .is-online {
+  background: #8ddc00;
+  animation: admin-login-pulse 2s infinite;
+}
+
+.tenant-admin-split-status .is-offline {
+  background: #ffb4ab;
+}
+
+.tenant-admin-stat {
+  display: block;
+  margin-top: 16px;
+  color: #ffffff;
+  font-family: Anybody, Inter, sans-serif;
+  font-size: 40px;
+  line-height: 1.1;
+}
+
+.tenant-admin-main-grid,
+.tenant-admin-camera-admin {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.tenant-admin-main-grid-single {
+  grid-template-columns: 1fr;
+}
+
+.tenant-admin-chart-card,
+.tenant-admin-table-card,
+.tenant-admin-form-card,
+.tenant-admin-camera-list-card,
+.tenant-admin-settings {
+  padding: 24px;
+}
+
+.tenant-admin-section-head {
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.tenant-admin-section-head h2 {
+  margin: 0;
+  color: #ffffff;
+  font-family: Anybody, Inter, sans-serif;
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+.tenant-admin-section-head p {
+  margin: 4px 0 0;
+  color: #c0caad;
+}
+
+.tenant-admin-section-head a,
+.tenant-admin-section-head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  color: #a1fb00;
+  background: transparent;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.tenant-admin-section-head select {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #ffffff;
+  background: #1c201f;
+}
+
+.tenant-admin-chart {
+  display: flex;
+  height: 256px;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 8px;
+}
+
+.tenant-admin-chart span {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: rgba(255, 255, 255, 0.1);
+  transition:
+    height 1s ease,
+    background 0.2s ease;
+}
+
+.tenant-admin-chart span:hover {
+  background: rgba(161, 251, 0, 0.3);
+}
+
+.tenant-admin-chart span.is-hot {
+  background: #a1fb00;
+}
+
+.tenant-admin-chart-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  color: #c0caad;
+}
+
+.tenant-admin-table-card {
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.tenant-admin-table-wrap {
+  overflow-x: auto;
+  margin: 0 -24px -24px;
+}
+
+.tenant-admin-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.tenant-admin-table th {
+  padding: 16px 24px;
+  color: #c0caad;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tenant-admin-table td {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px 24px;
+  color: #e0e3e0;
+}
+
+.tenant-admin-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tenant-admin-table td:last-child {
+  display: flex;
+  gap: 10px;
+}
+
+.tenant-admin-table td:last-child a {
+  color: #e0e3e0;
+}
+
+.tenant-admin-table td:last-child a:hover {
+  color: #a1fb00;
+}
+
+.tenant-admin-badge {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.tenant-admin-badge.is-success {
+  color: #a1fb00;
+  background: rgba(161, 251, 0, 0.2);
+}
+
+.tenant-admin-badge.is-error {
+  color: #ffb4ab;
+  background: rgba(255, 180, 171, 0.2);
+}
+
+.tenant-admin-form {
+  display: grid;
+  gap: 12px;
+}
+
+.tenant-admin-form label {
+  color: #c0caad;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.tenant-admin-form input,
+.tenant-admin-form textarea {
+  width: 100%;
+  border: 1px solid rgba(141, 220, 0, 0.18);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #ffffff;
+  background: rgba(11, 15, 14, 0.7);
+  outline: none;
+}
+
+.tenant-admin-form textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.tenant-admin-form input:focus,
+.tenant-admin-form textarea:focus {
+  border-color: #a1fb00;
+  box-shadow: 0 0 0 3px rgba(161, 251, 0, 0.1);
+}
+
+.tenant-admin-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tenant-admin-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #a1fb00;
+}
+
+.tenant-admin-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.tenant-admin-camera-list {
+  display: grid;
+  gap: 10px;
+}
+
+.tenant-admin-camera-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 14px;
+  color: #ffffff;
+  background: rgba(11, 15, 14, 0.5);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tenant-admin-camera-row:hover {
+  border-color: rgba(161, 251, 0, 0.42);
+}
+
+.tenant-admin-camera-row strong,
+.tenant-admin-camera-row small {
+  display: block;
+}
+
+.tenant-admin-camera-row small {
+  margin-top: 4px;
+  color: #c0caad;
+}
+
+.tenant-admin-camera-row em {
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.tenant-admin-camera-row em.is-online {
+  color: #102000;
+  background: #a1fb00;
+}
+
+.tenant-admin-camera-row em.is-offline {
+  color: #ffb4ab;
+  background: rgba(255, 180, 171, 0.14);
+}
+
+.tenant-admin-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.tenant-admin-settings-grid div {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 16px;
+  background: rgba(11, 15, 14, 0.45);
+}
+
+.tenant-admin-settings-grid strong,
+.tenant-admin-settings-grid span,
+.tenant-admin-settings-grid a {
+  display: block;
+}
+
+.tenant-admin-settings-grid strong {
+  margin-bottom: 8px;
+  color: #c0caad;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.tenant-admin-settings-grid a,
+.tenant-admin-settings-grid span {
+  color: #ffffff;
+  overflow-wrap: anywhere;
+}
+
+.tenant-admin-bottom-nav {
+  position: fixed;
+  z-index: 50;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: none;
+  height: 80px;
+  align-items: center;
+  justify-content: space-around;
+  border-top: 1px solid rgba(141, 220, 0, 0.2);
+  border-radius: 12px 12px 0 0;
+  background: rgba(28, 32, 31, 0.82);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(24px);
+}
+
+.tenant-admin-bottom-nav a {
+  display: flex;
+  min-width: 66px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 12px;
+  padding: 6px 10px;
+  color: #c0caad;
+  text-decoration: none;
+}
+
+.tenant-admin-bottom-nav a.is-active {
+  color: #a1fb00;
+  background: rgba(161, 251, 0, 0.1);
+  transform: scale(1.08);
+}
+
+@media (max-width: 900px) {
+  .tenant-admin-topbar-inner,
+  .tenant-admin-shell {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .tenant-admin-logo-link span,
+  .tenant-admin-desktop-nav {
+    display: none;
+  }
+
+  .tenant-admin-heading,
+  .tenant-admin-main-grid,
+  .tenant-admin-camera-admin {
+    grid-template-columns: 1fr;
+  }
+
+  .tenant-admin-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .tenant-admin-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .tenant-admin-camera-card {
+    grid-column: auto;
+  }
+
+  .tenant-admin-bottom-nav {
+    display: flex;
+  }
+}
+
+@media (max-width: 560px) {
+  .tenant-admin-chart {
+    gap: 6px;
+  }
+
+  .tenant-admin-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tenant-admin-form-actions,
+  .tenant-admin-heading-actions {
+    width: 100%;
+  }
+
+  .tenant-admin-primary,
+  .tenant-admin-secondary {
+    width: 100%;
+  }
 }
 
 .empty-state {

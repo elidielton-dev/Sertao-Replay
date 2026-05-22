@@ -53,13 +53,16 @@ class ReplayRequestRecord(BaseModel):
 
 class ReplayRecord(BaseModel):
     id: int
+    client_id: str = "default"
     camera_id: str
     camera_name: str
     title: str
     duration: int
     video_url: str | None = None
+    thumbnail_url: str | None = None
     download_url: str | None = None
     file_name: str | None = None
+    is_public: bool = True
     status: str
     source: str | None = None
     size_mb: float | None = None

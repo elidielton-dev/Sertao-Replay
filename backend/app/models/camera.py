@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -14,7 +14,9 @@ class CameraConfig(Base):
     __tablename__ = "cameras"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    client_id: Mapped[str] = mapped_column(String(64), ForeignKey("clients.id"), default="default", index=True)
     name: Mapped[str] = mapped_column(String(120))
+    slug: Mapped[str] = mapped_column(String(120), default="", index=True)
     rtsp_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="unknown", index=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)

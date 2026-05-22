@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -14,6 +14,7 @@ class Replay(Base):
     __tablename__ = "replays"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    client_id: Mapped[str] = mapped_column(String(64), ForeignKey("clients.id"), default="default", index=True)
     camera_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("cameras.id"),
@@ -23,6 +24,8 @@ class Replay(Base):
     title: Mapped[str] = mapped_column(String(160))
     duration: Mapped[int] = mapped_column(Integer, default=15)
     video_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    thumbnail_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="processing", index=True)

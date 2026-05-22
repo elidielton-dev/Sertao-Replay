@@ -10,6 +10,7 @@ class ReplayRequestQueue(Base):
     __tablename__ = "replay_requests"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    client_id: Mapped[str] = mapped_column(String(64), default="default", index=True)
     camera_id: Mapped[str] = mapped_column(String(64), index=True)
     seconds: Mapped[int] = mapped_column(Integer, default=15)
     label: Mapped[str | None] = mapped_column(String(120), nullable=True)

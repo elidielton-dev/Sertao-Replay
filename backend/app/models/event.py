@@ -10,6 +10,7 @@ class ReplayEvent(Base):
     __tablename__ = "replay_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    client_id: Mapped[str] = mapped_column(String(64), default="default", index=True)
     camera_id: Mapped[str] = mapped_column(String(50), index=True)
     action: Mapped[str] = mapped_column(String(50), index=True)
     seconds: Mapped[int] = mapped_column(Integer, default=15)

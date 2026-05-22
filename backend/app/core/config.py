@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./sports_replay.db"
     cors_origins: str = "*"
     operator_token: str | None = None
+    admin_token_secret: str | None = None
+    default_client_id: str = "mvp"
 
     cameras_config_path: str = "../config/cameras.json"
     replay_root: str = "./storage/replays"

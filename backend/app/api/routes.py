@@ -13,12 +13,15 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.sanitize import truncate_text
+from app.core.security import create_access_token, decode_access_token, verify_password
 from app.db.session import get_db
 from app.models.chat import ChatMessage
+from app.models.client import Client
 from app.models.event import ReplayEvent
 from app.models.replay_request import ReplayRequestQueue
 from app.models.system_log import SystemLog
-from app.schemas.camera import CameraCreate
+from app.models.user import User
+from app.schemas.camera import AdminCameraCreate, CameraCreate
 from app.schemas.replay import ReplayRequest
 from app.services.camera_service import CameraService
 from app.services.replay_service import ReplayService
@@ -34,9 +37,21 @@ DEFAULT_HLS_URL_MAP = "campo-01=http://54.207.185.74:8888/camera1/index.m3u8"
 
 
 class ChatMessageCreate(BaseModel):
+    client_slug: str | None = Field(default=None, max_length=120)
     camera_id: str | None = Field(default=None, max_length=64)
     user: str = Field(min_length=1, max_length=80)
     text: str = Field(min_length=1, max_length=500)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=180)
+    password: str = Field(min_length=1, max_length=200)
+
+
+class TenantContext(BaseModel):
+    client_id: str
+    user_id: str | None = None
+    role: str = "public"
 
 
 def require_operator(
@@ -54,6 +69,69 @@ def require_operator(
     raise HTTPException(status_code=403, detail="Acesso de operador nao autorizado.")
 
 
+def _default_client_id() -> str:
+    return settings.default_client_id or "arena-society-custodia"
+
+
+def _client_response(record: Client) -> dict[str, object]:
+    return {
+        "id": record.id,
+        "name": record.name,
+        "slug": record.slug,
+        "logo_url": record.logo_url,
+        "plan": record.plan,
+        "is_active": record.is_active,
+        "created_at": record.created_at.isoformat(),
+    }
+
+
+def get_client_by_slug(db: Session, slug: str) -> Client:
+    record = db.query(Client).filter(Client.slug == slug, Client.is_active.is_(True)).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Arena nao encontrada.")
+    return record
+
+
+def require_admin_user(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> User:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Login admin obrigatorio.")
+
+    payload = decode_access_token(authorization.split(" ", 1)[1].strip())
+    if not payload:
+        raise HTTPException(status_code=401, detail="Sessao expirada ou invalida.")
+
+    user = db.get(User, payload.get("sub"))
+    if not user or user.client_id != payload.get("client_id"):
+        raise HTTPException(status_code=401, detail="Usuario nao encontrado.")
+
+    return user
+
+
+def tenant_from_admin(user: User = Depends(require_admin_user)) -> TenantContext:
+    return TenantContext(client_id=user.client_id, user_id=user.id, role=user.role)
+
+
+def operator_tenant(
+    x_client_id: str | None = Header(default=None),
+    x_client_slug: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+) -> TenantContext:
+    if x_client_id:
+        client = db.get(Client, x_client_id)
+        if client and client.is_active:
+            return TenantContext(client_id=client.id, role="operator")
+
+    if x_client_slug:
+        client = get_client_by_slug(db, x_client_slug)
+        return TenantContext(client_id=client.id, role="operator")
+
+    return TenantContext(client_id=_default_client_id(), role="operator")
+
+
 def _request_response(record: ReplayRequestQueue) -> dict:
     return {
         "id": record.id,
@@ -67,9 +145,10 @@ def _request_response(record: ReplayRequestQueue) -> dict:
     }
 
 
-def _log(db: Session, source: str, level: str, message: str, camera_id: str | None = None) -> None:
+def _log(db: Session, source: str, level: str, message: str, camera_id: str | None = None, client_id: str | None = None) -> None:
     db.add(
         SystemLog(
+            client_id=client_id or _default_client_id(),
             source=source,
             level=level,
             camera_id=camera_id,
@@ -91,6 +170,7 @@ def _chat_initials(name: str) -> str:
 def _chat_response(record: ChatMessage) -> dict[str, object]:
     return {
         "id": record.id,
+        "client_id": record.client_id,
         "camera_id": record.camera_id,
         "user": record.user,
         "initials": record.initials,
@@ -181,6 +261,78 @@ def health():
     return {"ok": True, "message": "Sertao Replay API online"}
 
 
+@router.post("/auth/login")
+def login_admin(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == payload.email.strip().lower()).first()
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Email ou senha invalidos.")
+
+    client = db.get(Client, user.client_id)
+    if not client or not client.is_active:
+        raise HTTPException(status_code=403, detail="Cliente inativo.")
+
+    token = create_access_token({"sub": user.id, "client_id": user.client_id, "role": user.role})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {"id": user.id, "name": user.name, "email": user.email, "role": user.role, "client_id": user.client_id},
+        "client": _client_response(client),
+    }
+
+
+@router.get("/admin/me")
+def admin_me(user: User = Depends(require_admin_user), db: Session = Depends(get_db)):
+    client = db.get(Client, user.client_id)
+    return {
+        "user": {"id": user.id, "name": user.name, "email": user.email, "role": user.role, "client_id": user.client_id},
+        "client": _client_response(client) if client else None,
+    }
+
+
+@router.get("/public/clients/{slug}")
+def public_client(slug: str, db: Session = Depends(get_db)):
+    return _client_response(get_client_by_slug(db, slug))
+
+
+@router.get("/public/clients/{slug}/cameras")
+def public_client_cameras(slug: str, db: Session = Depends(get_db)):
+    client = get_client_by_slug(db, slug)
+    return camera_service.list_cameras(db, client_id=client.id)
+
+
+@router.get("/public/clients/{slug}/cameras/{camera_slug}")
+def public_client_camera(slug: str, camera_slug: str, db: Session = Depends(get_db)):
+    client = get_client_by_slug(db, slug)
+    try:
+        return camera_service.get_camera_by_slug(db, client.id, camera_slug)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/public/clients/{slug}/replays")
+def public_client_replays(slug: str, camera_slug: str | None = None, db: Session = Depends(get_db)):
+    client = get_client_by_slug(db, slug)
+    records = replay_service.list_replays(db, client_id=client.id, public_only=True)
+    if not camera_slug:
+        return records
+
+    try:
+        camera = camera_service.get_camera_by_slug(db, client.id, camera_slug)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return [record for record in records if record["camera_id"] == camera.id]
+
+
+@router.get("/public/clients/{slug}/replays/{replay_id}")
+def public_client_replay(slug: str, replay_id: int, db: Session = Depends(get_db)):
+    client = get_client_by_slug(db, slug)
+    records = replay_service.list_replays(db, client_id=client.id, public_only=True)
+    replay = next((record for record in records if record["id"] == replay_id), None)
+    if not replay:
+        raise HTTPException(status_code=404, detail="Replay nao encontrado.")
+    return replay
+
+
 @router.get("/cameras/{camera_id}/hls/{asset_path:path}")
 async def proxy_camera_hls(request: Request, camera_id: str, asset_path: str = "index.m3u8"):
     safe_asset_path = (asset_path or "index.m3u8").strip()
@@ -231,12 +383,14 @@ async def proxy_camera_hls(request: Request, camera_id: str, asset_path: str = "
 
 @router.get("/chat/messages")
 def list_chat_messages(
+    client_slug: str | None = None,
     camera_id: str | None = None,
     limit: int = 80,
     db: Session = Depends(get_db),
 ):
     safe_limit = min(max(limit, 1), 200)
-    query = db.query(ChatMessage)
+    client_id = get_client_by_slug(db, client_slug).id if client_slug else _default_client_id()
+    query = db.query(ChatMessage).filter(ChatMessage.client_id == client_id)
     if camera_id:
         query = query.filter(ChatMessage.camera_id == camera_id)
 
@@ -249,10 +403,12 @@ def create_chat_message(payload: ChatMessageCreate, db: Session = Depends(get_db
     user = truncate_text(payload.user.strip(), 80) or "Torcedor"
     text = truncate_text(payload.text.strip(), 500)
     camera_id = truncate_text((payload.camera_id or "").strip(), 64) or None
+    client_id = get_client_by_slug(db, payload.client_slug).id if payload.client_slug else _default_client_id()
     if not text:
         raise HTTPException(status_code=400, detail="Mensagem vazia.")
 
     record = ChatMessage(
+        client_id=client_id,
         camera_id=camera_id,
         user=user,
         initials=_chat_initials(user),
@@ -266,30 +422,85 @@ def create_chat_message(payload: ChatMessageCreate, db: Session = Depends(get_db
 
 @router.get("/cameras")
 def list_cameras(db: Session = Depends(get_db)):
-    return camera_service.list_cameras(db)
+    return camera_service.list_cameras(db, client_id=_default_client_id())
 
 
 @router.get("/cameras/admin")
-def list_admin_cameras(db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    return camera_service.list_all_cameras(db)
+def list_admin_cameras(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_operator),
+):
+    return camera_service.list_all_cameras(db, client_id=_default_client_id())
+
+
+@router.get("/admin/cameras")
+def list_tenant_admin_cameras(db: Session = Depends(get_db), tenant: TenantContext = Depends(tenant_from_admin)):
+    return camera_service.list_all_cameras(db, client_id=tenant.client_id)
+
+
+@router.get("/admin/replays")
+def list_tenant_admin_replays(db: Session = Depends(get_db), tenant: TenantContext = Depends(tenant_from_admin)):
+    return replay_service.list_replays(db, client_id=tenant.client_id)
+
+
+@router.get("/admin/dashboard")
+def tenant_dashboard(db: Session = Depends(get_db), tenant: TenantContext = Depends(tenant_from_admin)):
+    cameras = camera_service.list_all_cameras(db, client_id=tenant.client_id)
+    replays = replay_service.list_replays(db, client_id=tenant.client_id)
+    return {
+        "client_id": tenant.client_id,
+        "cameras_total": len(cameras),
+        "replays_total": len(replays),
+        "public_replays_total": len([replay for replay in replays if replay.get("is_public")]),
+        "cameras": cameras,
+        "recent_replays": replays[:8],
+    }
+
+
+@router.get("/admin/settings")
+def tenant_settings(db: Session = Depends(get_db), tenant: TenantContext = Depends(tenant_from_admin)):
+    client = db.get(Client, tenant.client_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente nao encontrado.")
+    return _client_response(client)
 
 
 @router.get("/cameras/{camera_id}/config")
 def get_camera_config(
     camera_id: str,
     db: Session = Depends(get_db),
-    _: None = Depends(require_operator),
+    tenant: TenantContext = Depends(operator_tenant),
 ):
     try:
-        return camera_service.get_camera(db, camera_id, include_disabled=True)
+        return camera_service.get_camera(db, camera_id, include_disabled=True, client_id=tenant.client_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/cameras")
-def save_camera(camera: CameraCreate, db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    record = camera_service.save_camera(db, camera)
-    _log(db, "backend", "info", f"Camera cadastrada ou atualizada: {record.id}", record.id)
+def save_camera(
+    camera: CameraCreate,
+    db: Session = Depends(get_db),
+    tenant: TenantContext = Depends(operator_tenant),
+):
+    record = camera_service.save_camera(db, camera, client_id=tenant.client_id)
+    _log(db, "backend", "info", f"Camera cadastrada ou atualizada: {record.id}", record.id, tenant.client_id)
+    db.commit()
+    return record
+
+
+@router.post("/admin/cameras")
+def save_tenant_admin_camera(
+    camera: AdminCameraCreate,
+    db: Session = Depends(get_db),
+    tenant: TenantContext = Depends(tenant_from_admin),
+):
+    try:
+        record = camera_service.save_admin_camera_from_ip(db, camera, client_id=tenant.client_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    _log(db, "admin", "info", f"Camera salva no admin: {record.id}", record.id, tenant.client_id)
     db.commit()
     return record
 
@@ -300,15 +511,15 @@ def update_camera_status(
     status: str = Form(...),
     message: str | None = Form(default=None),
     db: Session = Depends(get_db),
-    _: None = Depends(require_operator),
+    tenant: TenantContext = Depends(operator_tenant),
 ):
     try:
-        camera_service.get_camera(db, camera_id, include_disabled=True)
+        camera_service.get_camera(db, camera_id, include_disabled=True, client_id=tenant.client_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    camera_service.update_status(db, camera_id, status)
-    _log(db, "capture-server", "info", message or f"Camera {camera_id}: {status}", camera_id)
+    camera_service.update_status(db, camera_id, status, client_id=tenant.client_id)
+    _log(db, "capture-server", "info", message or f"Camera {camera_id}: {status}", camera_id, tenant.client_id)
     db.commit()
     return {"ok": True, "camera_id": camera_id, "status": status}
 
@@ -318,13 +529,13 @@ def upload_camera_snapshot(
     camera_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _: None = Depends(require_operator),
+    tenant: TenantContext = Depends(operator_tenant),
 ):
     if file.content_type and file.content_type not in {"image/jpeg", "image/jpg"}:
         raise HTTPException(status_code=400, detail="Envie um snapshot JPEG.")
 
     try:
-        camera_service.get_camera(db, camera_id, include_disabled=True)
+        camera_service.get_camera(db, camera_id, include_disabled=True, client_id=tenant.client_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -334,7 +545,7 @@ def upload_camera_snapshot(
         while chunk := file.file.read(1024 * 1024):
             output.write(chunk)
 
-    camera_service.update_status(db, camera_id, "recording")
+    camera_service.update_status(db, camera_id, "recording", client_id=tenant.client_id)
     db.commit()
     return {"ok": True, "camera_id": camera_id, "snapshot_url": f"/api/cameras/{camera_id}/snapshot.jpg"}
 
@@ -355,7 +566,7 @@ def get_camera_snapshot(camera_id: str):
 @router.post("/cameras/{camera_id}/webrtc/offer")
 async def create_webrtc_offer(camera_id: str, request: Request, db: Session = Depends(get_db)):
     try:
-        camera_service.get_camera(db, camera_id)
+        camera_service.get_camera(db, camera_id, client_id=_default_client_id())
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -389,7 +600,7 @@ async def create_webrtc_offer(camera_id: str, request: Request, db: Session = De
 
 @router.get("/replays")
 def list_replays(db: Session = Depends(get_db)):
-    return replay_service.list_replays(db)
+    return replay_service.list_replays(db, client_id=_default_client_id())
 
 
 @router.post("/replays")
@@ -418,13 +629,13 @@ def upload_replay(
     request_id: int | None = Form(default=None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _: None = Depends(require_operator),
+    tenant: TenantContext = Depends(operator_tenant),
 ):
     if not file.filename.lower().endswith(".mp4"):
         raise HTTPException(status_code=400, detail="Envie um arquivo MP4.")
 
     try:
-        camera = camera_service.get_camera(db, camera_id, include_disabled=True)
+        camera = camera_service.get_camera(db, camera_id, include_disabled=True, client_id=tenant.client_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -436,17 +647,21 @@ def upload_replay(
         camera_name=camera.name,
         seconds=seconds,
         label=label,
+        client_id=tenant.client_id,
     )
 
     if request_id:
         request_record = db.get(ReplayRequestQueue, request_id)
         if request_record:
+            if request_record.client_id != tenant.client_id:
+                raise HTTPException(status_code=403, detail="Solicitacao pertence a outro cliente.")
             request_record.status = "completed"
             request_record.completed_at = datetime.utcnow()
             request_record.message = f"Replay publicado: {record.file_name}"
 
     db.add(
         ReplayEvent(
+            client_id=tenant.client_id,
             camera_id=camera_id,
             action="upload",
             seconds=seconds,
@@ -454,7 +669,7 @@ def upload_replay(
             status="success",
         )
     )
-    _log(db, "capture-server", "info", f"Replay recebido: {record.file_name}", camera_id)
+    _log(db, "capture-server", "info", f"Replay recebido: {record.file_name}", camera_id, tenant.client_id)
     db.commit()
 
     response = replay_service.to_response(record)
@@ -488,12 +703,14 @@ def create_replay_request(
     payload: ReplayRequest,
     db: Session = Depends(get_db),
 ):
+    client_id = _default_client_id()
     try:
-        camera = camera_service.get_camera(db, payload.camera_id)
+        camera = camera_service.get_camera(db, payload.camera_id, client_id=client_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     record = ReplayRequestQueue(
+        client_id=client_id,
         camera_id=camera.id,
         seconds=payload.seconds,
         label=payload.label,
@@ -503,13 +720,14 @@ def create_replay_request(
     db.add(record)
     db.add(
         ReplayEvent(
+            client_id=client_id,
             camera_id=camera.id,
             action="request",
             seconds=payload.seconds,
             status="pending",
         )
     )
-    _log(db, "frontend", "info", f"Solicitacao de replay criada: {payload.seconds}s", camera.id)
+    _log(db, "frontend", "info", f"Solicitacao de replay criada: {payload.seconds}s", camera.id, client_id)
     db.commit()
     db.refresh(record)
     logger.info("Solicitacao de replay criada. request_id=%s camera_id=%s", record.id, camera.id)
@@ -520,11 +738,12 @@ def create_replay_request(
 def list_pending_replay_requests(
     camera_id: str | None = None,
     db: Session = Depends(get_db),
-    _: None = Depends(require_operator),
+    tenant: TenantContext = Depends(operator_tenant),
 ):
     stale_before = datetime.utcnow() - timedelta(minutes=2)
     stale = (
         db.query(ReplayRequestQueue)
+        .filter(ReplayRequestQueue.client_id == tenant.client_id)
         .filter(ReplayRequestQueue.status == "processing")
         .filter(ReplayRequestQueue.claimed_at < stale_before)
         .all()
@@ -534,7 +753,10 @@ def list_pending_replay_requests(
         record.message = "Reenfileirado apos timeout do capture-server."
         record.claimed_at = None
 
-    query = db.query(ReplayRequestQueue).filter(ReplayRequestQueue.status == "pending")
+    query = db.query(ReplayRequestQueue).filter(
+        ReplayRequestQueue.client_id == tenant.client_id,
+        ReplayRequestQueue.status == "pending",
+    )
     if camera_id:
         query = query.filter(ReplayRequestQueue.camera_id == camera_id)
 
@@ -557,34 +779,48 @@ def fail_replay_request(
     request_id: int,
     message: str = Form(...),
     db: Session = Depends(get_db),
-    _: None = Depends(require_operator),
+    tenant: TenantContext = Depends(operator_tenant),
 ):
     record = db.get(ReplayRequestQueue, request_id)
     if not record:
         raise HTTPException(status_code=404, detail="Solicitacao nao encontrada.")
+    if record.client_id != tenant.client_id:
+        raise HTTPException(status_code=403, detail="Solicitacao pertence a outro cliente.")
 
     record.status = "failed"
     record.completed_at = datetime.utcnow()
     record.message = truncate_text(message, 500) or "Falha ao gerar replay."
     db.add(
         ReplayEvent(
+            client_id=tenant.client_id,
             camera_id=record.camera_id,
             action="request_failed",
             seconds=record.seconds,
             status="error",
         )
     )
-    _log(db, "capture-server", "error", record.message, record.camera_id)
+    _log(db, "capture-server", "error", record.message, record.camera_id, tenant.client_id)
     db.commit()
     return {"ok": True, "request": _request_response(record)}
 
 
 @router.get("/logs")
 def list_logs(db: Session = Depends(get_db), _: None = Depends(require_operator)):
-    records = db.query(SystemLog).order_by(SystemLog.created_at.desc()).limit(100).all()
+    records = db.query(SystemLog).filter(SystemLog.client_id == _default_client_id()).order_by(SystemLog.created_at.desc()).limit(100).all()
+    return _logs_response(records)
+
+
+@router.get("/admin/logs")
+def list_tenant_logs(db: Session = Depends(get_db), tenant: TenantContext = Depends(tenant_from_admin)):
+    records = db.query(SystemLog).filter(SystemLog.client_id == tenant.client_id).order_by(SystemLog.created_at.desc()).limit(100).all()
+    return _logs_response(records)
+
+
+def _logs_response(records: list[SystemLog]) -> list[dict[str, object]]:
     return [
         {
             "id": record.id,
+            "client_id": record.client_id,
             "source": record.source,
             "level": record.level,
             "camera_id": record.camera_id,
@@ -602,8 +838,8 @@ def create_log(
     message: str = Form(...),
     camera_id: str | None = Form(default=None),
     db: Session = Depends(get_db),
-    _: None = Depends(require_operator),
+    tenant: TenantContext = Depends(operator_tenant),
 ):
-    _log(db, source, level, message, camera_id)
+    _log(db, source, level, message, camera_id, tenant.client_id)
     db.commit()
     return {"ok": True}

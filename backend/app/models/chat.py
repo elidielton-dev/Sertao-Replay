@@ -10,6 +10,7 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    client_id: Mapped[str] = mapped_column(String(64), default="default", index=True)
     camera_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     user: Mapped[str] = mapped_column(String(80))
     initials: Mapped[str] = mapped_column(String(4))

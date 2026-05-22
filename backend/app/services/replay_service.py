@@ -39,6 +39,7 @@ class ReplayService:
             camera = db.get(CameraConfig, camera_id)
             db.add(
                 Replay(
+                    client_id="arena-society-custodia",
                     camera_id=camera_id,
                     camera_name=camera.name if camera else camera_id,
                     title=self._title_from_file(file.name),
@@ -55,9 +56,14 @@ class ReplayService:
         db.commit()
         logger.info("Replays existentes importados para o banco. total=%s", imported)
 
-    def list_replays(self, db: Session) -> list[dict]:
+    def list_replays(self, db: Session, client_id: str | None = None, public_only: bool = False) -> list[dict]:
         self.sync_existing_files_to_db(db)
-        records = db.query(Replay).order_by(Replay.created_at.desc()).all()
+        query = db.query(Replay)
+        if client_id:
+            query = query.filter(Replay.client_id == client_id)
+        if public_only:
+            query = query.filter(Replay.is_public.is_(True), Replay.status == "ready")
+        records = query.order_by(Replay.created_at.desc()).all()
         return [self.to_response(record) for record in records]
 
     def save_uploaded_replay(
@@ -69,6 +75,7 @@ class ReplayService:
         camera_name: str,
         seconds: int,
         label: str | None,
+        client_id: str = "arena-society-custodia",
     ) -> Replay:
         self.settings.replay_path.mkdir(parents=True, exist_ok=True)
         safe_name = self._safe_upload_filename(original_filename, camera_id, seconds, label)
@@ -79,15 +86,18 @@ class ReplayService:
 
         title = (label or f"Replay {seconds}s").strip() or f"Replay {seconds}s"
         record = Replay(
+            client_id=client_id,
             camera_id=camera_id,
             camera_name=camera_name,
             title=title,
             duration=seconds,
             video_url=f"/api/replays/file/{replay_file.name}",
+            thumbnail_url=None,
             file_name=replay_file.name,
             file_path=str(replay_file),
             status="ready",
             source="capture_server",
+            is_public=True,
         )
         db.add(record)
         db.flush()
@@ -101,14 +111,17 @@ class ReplayService:
 
         return {
             "id": record.id,
+            "client_id": record.client_id,
             "camera_id": record.camera_id,
             "camera_name": record.camera_name,
             "title": record.title,
             "duration": record.duration,
             "video_url": record.video_url,
+            "thumbnail_url": record.thumbnail_url,
             "download_url": record.video_url,
             "file_name": record.file_name,
             "name": record.file_name,
+            "is_public": record.is_public,
             "status": record.status,
             "source": record.source,
             "size_mb": size_mb,

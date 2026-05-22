@@ -2,15 +2,26 @@
   Activity,
   Camera,
   CheckCircle2,
+  Download,
+  Eye,
+  EyeOff,
   FileText,
   Home,
+  History,
   KeyRound,
   Loader2,
+  Lock,
+  LogIn,
+  Menu,
   Plus,
   RotateCcw,
   Save,
   Send,
   Settings,
+  ShieldCheck,
+  TrendingUp,
+  UserRound,
+  Users,
   Video,
   X,
 } from "lucide-react";
@@ -21,7 +32,9 @@ const DEFAULT_API_BASE =
   typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
     ? "https://sertao-replay.onrender.com/api"
     : "/api";
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/$/, "");
+const IS_LOCAL_FRONTEND =
+  typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+const API_BASE = (IS_LOCAL_FRONTEND ? "/api" : import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/$/, "");
 const DEFAULT_WEBRTC_BASE =
   typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
     ? "http://localhost:8889"
@@ -32,6 +45,7 @@ const DEFAULT_HLS_CAMERA_MAP = {
   "campo-01": `${API_BASE}/cameras/campo-01/hls/index.m3u8`,
 };
 const OPERATOR_TOKEN_KEY = "sertao_operator_token";
+const ADMIN_SESSION_KEY = "sertao_admin_session";
 const REPLAY_HOTKEY_SECONDS = {
   F13: 15,
   F14: 15,
@@ -70,10 +84,11 @@ function mediaUrl(value) {
   return `${API_BASE}/${value.replace(/^\//, "")}`;
 }
 
-async function apiRequest(path, { token, ...options } = {}) {
+async function apiRequest(path, { token, bearerToken, ...options } = {}) {
   const headers = {
     ...(options.body ? { "Content-Type": "application/json" } : {}),
     ...(token ? { "X-Operator-Token": token } : {}),
+    ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
     ...(options.headers || {}),
   };
 
@@ -103,17 +118,50 @@ function cameraBackendId(fieldId, cameraId) {
   return `${fieldBackendId(fieldId)}-camera-${String(cameraId).padStart(2, "0")}`;
 }
 
-function cameraRoute(fieldId, cameraId) {
-  return `/campo${fieldId}/camera${cameraId}`;
+function clientPath(clientSlug, path = "") {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return clientSlug ? `/${encodeURIComponent(clientSlug)}${cleanPath}` : cleanPath;
 }
 
-function cameraPathFromBackendId(cameraId) {
-  const match = String(cameraId).match(/^campo-?(\d+)(?:-(?:camera|cam)-?(\d+))?$/i);
-  if (match) {
-    return cameraRoute(Number(match[1]), Number(match[2] || 1));
+function clientApiPath(clientSlug, resourcePath) {
+  if (!clientSlug) {
+    return resourcePath;
   }
 
-  return "/teste";
+  return `/public/clients/${encodeURIComponent(clientSlug)}${resourcePath}`;
+}
+
+function cameraRoute(fieldId, cameraId, clientSlug = "") {
+  return clientPath(clientSlug, `/campo${fieldId}/camera${cameraId}`);
+}
+
+function tenantCameraRoute(tenantSlug, camera) {
+  return `/a/${tenantSlug}/campo/${camera.slug || camera.id}`;
+}
+
+function loadAdminSession() {
+  try {
+    return JSON.parse(localStorage.getItem(ADMIN_SESSION_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveAdminSession(session) {
+  if (session) {
+    localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
+  } else {
+    localStorage.removeItem(ADMIN_SESSION_KEY);
+  }
+}
+
+function cameraPathFromBackendId(cameraId, clientSlug = "") {
+  const match = String(cameraId).match(/^campo-?(\d+)(?:-(?:camera|cam)-?(\d+))?$/i);
+  if (match) {
+    return cameraRoute(Number(match[1]), Number(match[2] || 1), clientSlug);
+  }
+
+  return clientPath(clientSlug, "/teste");
 }
 
 function fieldNumber(value) {
@@ -173,7 +221,7 @@ function cameraTemplate(cameraId) {
   return cameras[(Number(cameraId) - 1) % cameras.length] || cameras[0];
 }
 
-function buildRegisteredFields(apiCameras = []) {
+function buildRegisteredFields(apiCameras = [], clientSlug = "") {
   const grouped = new Map();
 
   apiCameras
@@ -201,7 +249,7 @@ function buildRegisteredFields(apiCameras = []) {
         grouped.set(identity.fieldId, {
           id: identity.fieldId,
           number: fieldNumber(identity.fieldId),
-          href: `/campo${identity.fieldId}`,
+          href: clientPath(clientSlug, `/campo${identity.fieldId}`),
           featured: false,
           cameras: [],
         });
@@ -351,13 +399,19 @@ function SponsorCard({ sponsor }) {
   );
 }
 
-function HomeNav() {
+function HomeNav({ clientSlug = "" }) {
+  const navItems = [
+    { label: "STREAMING", href: clientPath(clientSlug, "/streaming") },
+    { label: "HIGHLIGHTS", href: clientPath(clientSlug, "/highlights") },
+    { label: "TOURNAMENTS", href: clientPath(clientSlug, "/torneio") },
+  ];
+
   return (
     <nav className="relative z-10 w-full" aria-label="NavegaÃ§Ã£o principal">
       <div className="grid gap-4 border-t border-[#5d2bff] bg-black/90 px-4 py-5 shadow-[0_18px_50px_rgba(0,0,0,0.55)] backdrop-blur-md sm:px-6 md:grid-cols-[220px_minmax(0,1fr)] md:items-center lg:min-h-[82px] lg:grid-cols-[260px_1fr_260px] lg:gap-0 lg:px-0 lg:py-0">
         <a
           className="flex w-fit min-w-0 items-center transition hover:opacity-90 lg:h-full lg:border-r lg:border-neon-green/10 lg:px-6"
-          href="/"
+          href={clientPath(clientSlug, "/")}
           aria-label="SertÃ£o Replay - inÃ­cio"
         >
           <img
@@ -386,7 +440,7 @@ function HomeNav() {
   );
 }
 
-function HomePage() {
+function HomePage({ clientSlug = "", section = "" }) {
   const [registeredFields, setRegisteredFields] = useState([]);
   const [fieldsStatus, setFieldsStatus] = useState("loading");
   const [fieldsError, setFieldsError] = useState("");
@@ -395,8 +449,8 @@ function HomePage() {
     async function loadRegisteredCameras() {
       setFieldsStatus("loading");
       try {
-        const data = await apiRequest("/cameras");
-        setRegisteredFields(buildRegisteredFields(Array.isArray(data) ? data : []));
+        const data = await apiRequest(clientApiPath(clientSlug, "/cameras"));
+        setRegisteredFields(buildRegisteredFields(Array.isArray(data) ? data : [], clientSlug));
         setFieldsStatus("ready");
         setFieldsError("");
       } catch (error) {
@@ -407,12 +461,23 @@ function HomePage() {
     }
 
     loadRegisteredCameras();
-  }, []);
+  }, [clientSlug]);
+
+  useEffect(() => {
+    if (!section) {
+      return;
+    }
+
+    const targetId = section === "torneio" ? "tournaments" : section;
+    window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ block: "start" });
+    });
+  }, [section]);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden bg-dark-bg text-white shadow-[0_0_80px_rgba(0,0,0,0.45)] sm:max-w-2xl md:max-w-4xl lg:max-w-6xl lg:overflow-visible lg:bg-transparent lg:px-6 xl:px-0">
       <header className="relative z-10" data-purpose="page-header">
-        <HomeNav />
+        <HomeNav clientSlug={clientSlug} />
       </header>
 
       <section id="streaming" className="mb-8 space-y-4 px-4 pt-6 sm:px-6 lg:mb-10 lg:px-0 lg:pt-10" data-purpose="field-selection" aria-label="SeleÃ§Ã£o de campo">
@@ -443,7 +508,7 @@ function HomePage() {
         ) : null}
       </section>
 
-      <section className="mb-8 px-4 sm:px-6 lg:mb-10 lg:px-0" id="highlights" data-purpose="highlights">
+      <section className={`mb-8 px-4 sm:px-6 lg:mb-10 lg:px-0 ${section === "highlights" ? "scroll-mt-6" : ""}`} id="highlights" data-purpose="highlights">
         <div className="mb-4 flex items-center gap-2 lg:mb-5">
           <StarIcon />
           <h2 className="m-0 text-lg font-black uppercase tracking-wide lg:text-2xl">Algum Destaque</h2>
@@ -498,7 +563,7 @@ function HomePage() {
         </article>
       </section>
 
-      <section id="tournaments" className="mb-12 px-4 sm:px-6 lg:mb-16 lg:px-0" data-purpose="sponsors">
+      <section id="tournaments" className={`mb-12 px-4 sm:px-6 lg:mb-16 lg:px-0 ${section === "torneio" ? "scroll-mt-6" : ""}`} data-purpose="sponsors">
         <div className="mb-4 flex items-center gap-2 lg:mb-5">
           <BriefcaseIcon />
           <h2 className="m-0 text-lg font-black uppercase tracking-wide lg:text-2xl">Patrocinadores</h2>
@@ -526,6 +591,202 @@ function HomePage() {
   );
 }
 
+function PublicTenantPage({ slug }) {
+  const [client, setClient] = useState(null);
+  const [cameras, setCameras] = useState([]);
+  const [replays, setReplays] = useState([]);
+  const [status, setStatus] = useState("loading");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    async function loadTenant() {
+      setStatus("loading");
+      try {
+        const [clientData, cameraData, replayData] = await Promise.all([
+          apiRequest(`/public/clients/${encodeURIComponent(slug)}`),
+          apiRequest(`/public/clients/${encodeURIComponent(slug)}/cameras`),
+          apiRequest(`/public/clients/${encodeURIComponent(slug)}/replays`),
+        ]);
+        setClient(clientData);
+        setCameras(Array.isArray(cameraData) ? cameraData : []);
+        setReplays(Array.isArray(replayData) ? replayData : []);
+        setStatus("ready");
+        setMessage("");
+      } catch (error) {
+        setStatus("error");
+        setMessage(error.message);
+      }
+    }
+
+    loadTenant();
+  }, [slug]);
+
+  return (
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden bg-dark-bg text-white shadow-[0_0_80px_rgba(0,0,0,0.45)] sm:max-w-2xl md:max-w-4xl lg:max-w-6xl lg:overflow-visible lg:bg-transparent lg:px-6 xl:px-0">
+      <header className="border-t border-[#5d2bff] bg-black/90 px-4 py-5 sm:px-6 lg:rounded-b-3xl">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <a href="/" className="flex items-center">
+            <img alt="Sertao Replay" className="h-11 w-auto object-contain" src={client?.logo_url || "/assets/logo-sertao-replay-nav.png"} />
+          </a>
+          <span className="rounded-full border border-neon-green/40 px-4 py-2 text-xs font-black uppercase text-neon-green">
+            {client?.name || "Arena"}
+          </span>
+        </div>
+      </header>
+
+      <section className="px-4 py-8 sm:px-6 lg:px-0">
+        <p className="eyebrow">Replays publicos</p>
+        <h1 className="mb-3 text-3xl font-black uppercase leading-tight sm:text-5xl">{client?.name || "Arena Sertao Replay"}</h1>
+        <p className="max-w-2xl text-sm text-gray-300 sm:text-base">
+          Acesse os ultimos lances da arena pelo QR Code. Nao precisa de login.
+        </p>
+      </section>
+
+      {status === "error" ? (
+        <section className="px-4 sm:px-6 lg:px-0">
+          <div className="glass-card rounded-2xl p-5 text-sm text-gray-300">{message}</div>
+        </section>
+      ) : null}
+
+      <section className="mb-8 px-4 sm:px-6 lg:px-0">
+        <div className="mb-4 flex items-center gap-2">
+          <Camera className="h-5 w-5 text-neon-green" />
+          <h2 className="m-0 text-xl font-black uppercase">Cameras</h2>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {cameras.map((camera) => (
+            <a key={camera.id} href={tenantCameraRoute(slug, camera)} className="glass-card flex min-w-0 items-center justify-between gap-4 rounded-2xl p-5 text-white no-underline">
+              <div className="min-w-0">
+                <p className="m-0 text-xs font-black uppercase text-gray-400">Campo / camera</p>
+                <h3 className="m-0 truncate text-2xl font-black text-neon-green">{camera.name}</h3>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${camera.status === "recording" ? "bg-neon-green text-black" : "bg-red-500 text-white"}`}>
+                {camera.status === "recording" ? "Ao vivo" : "Offline"}
+              </span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-12 px-4 sm:px-6 lg:px-0">
+        <div className="mb-4 flex items-center gap-2">
+          <Video className="h-5 w-5 text-neon-green" />
+          <h2 className="m-0 text-xl font-black uppercase">Ultimos replays</h2>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {replays.map((replay) => (
+            <a key={replay.id} href={`/a/${slug}/replay/${replay.id}`} className="group text-white no-underline">
+              <div className="relative mb-2 aspect-video overflow-hidden rounded-xl bg-[#0b0f0e]">
+                <video className="h-full w-full object-cover opacity-70 transition group-hover:opacity-100" src={mediaUrl(replay.video_url)} preload="metadata" muted />
+                <span className="absolute bottom-2 right-2 rounded bg-black/80 px-2 py-1 text-xs text-white">{replayDurationLabel(replay.duration)}</span>
+              </div>
+              <h3 className="mb-1 line-clamp-2 font-bold group-hover:text-neon-green">{replayTitle(replay)}</h3>
+              <p className="m-0 text-sm text-gray-400">{formatDate(replay.created_at)}</p>
+            </a>
+          ))}
+          {status === "ready" && !replays.length ? (
+            <div className="glass-card rounded-2xl p-5 text-sm text-gray-300">Nenhum replay publico ainda.</div>
+          ) : null}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function PublicCameraPage({ slug, cameraSlug }) {
+  const [camera, setCamera] = useState(null);
+  const [replays, setReplays] = useState([]);
+  const [status, setStatus] = useState("loading");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    async function loadCamera() {
+      setStatus("loading");
+      try {
+        const [cameraData, replayData] = await Promise.all([
+          apiRequest(`/public/clients/${encodeURIComponent(slug)}/cameras/${encodeURIComponent(cameraSlug)}`),
+          apiRequest(`/public/clients/${encodeURIComponent(slug)}/replays?camera_slug=${encodeURIComponent(cameraSlug)}`),
+        ]);
+        setCamera(cameraData);
+        setReplays(Array.isArray(replayData) ? replayData : []);
+        setStatus("ready");
+        setMessage("");
+      } catch (error) {
+        setStatus("error");
+        setMessage(error.message);
+      }
+    }
+
+    loadCamera();
+  }, [slug, cameraSlug]);
+
+  return (
+    <main className="min-h-screen bg-[#0a0f0d] px-4 py-6 text-white sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-6xl">
+        <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <a href={`/a/${slug}`}><img alt="Sertao Replay" className="h-11 w-auto object-contain" src="/assets/logo-sertao-replay-nav.png" /></a>
+          <a className="rounded-full border border-[#8ddc00]/40 px-4 py-2 text-sm font-bold text-[#a1fb00] no-underline" href={`/a/${slug}`}>Voltar</a>
+        </header>
+        <section className="mb-8">
+          <p className="eyebrow">Camera publica</p>
+          <h1 className="text-3xl font-black sm:text-5xl">{camera?.name || "Camera"}</h1>
+          {status === "error" ? <p className="text-red-300">{message}</p> : <p className="text-gray-400">Replays publicos desta camera.</p>}
+        </section>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {replays.map((replay) => (
+            <a key={replay.id} href={`/a/${slug}/replay/${replay.id}`} className="group text-white no-underline">
+              <div className="relative mb-2 aspect-video overflow-hidden rounded-xl bg-black">
+                <video className="h-full w-full object-cover opacity-70 group-hover:opacity-100" src={mediaUrl(replay.video_url)} preload="metadata" muted />
+                <PlayCircleIcon className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 text-white" />
+              </div>
+              <h2 className="m-0 text-lg font-black group-hover:text-[#a1fb00]">{replayTitle(replay)}</h2>
+              <p className="m-0 text-sm text-gray-400">{formatDate(replay.created_at)}</p>
+            </a>
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function PublicReplayPage({ slug, replayId }) {
+  const [replay, setReplay] = useState(null);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    async function loadReplay() {
+      try {
+        const data = await apiRequest(`/public/clients/${encodeURIComponent(slug)}/replays/${encodeURIComponent(replayId)}`);
+        setReplay(data);
+        setMessage("");
+      } catch (error) {
+        setMessage(error.message);
+      }
+    }
+
+    loadReplay();
+  }, [slug, replayId]);
+
+  return (
+    <main className="min-h-screen bg-[#0a0f0d] px-4 py-6 text-white sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-5xl">
+        <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <a href={`/a/${slug}`}><img alt="Sertao Replay" className="h-11 w-auto object-contain" src="/assets/logo-sertao-replay-nav.png" /></a>
+          <a className="rounded-full border border-[#8ddc00]/40 px-4 py-2 text-sm font-bold text-[#a1fb00] no-underline" href={`/a/${slug}`}>Voltar</a>
+        </header>
+        {message ? <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-red-200">{message}</div> : null}
+        {replay ? (
+          <>
+            <h1 className="mb-4 text-3xl font-black sm:text-5xl">{replayTitle(replay)}</h1>
+            <video className="aspect-video w-full rounded-2xl bg-black object-contain" src={mediaUrl(replay.video_url)} controls playsInline preload="metadata" />
+            <a className="mt-4 inline-flex rounded-xl bg-[#a1fb00] px-5 py-3 font-black text-black no-underline" href={mediaUrl(replay.download_url || replay.video_url)} download>Baixar replay</a>
+          </>
+        ) : null}
+      </div>
+    </main>
+  );
+}
+
 function CameraGlyph({ className = "h-5 w-5" }) {
   return (
     <svg className={className} fill="currentColor" viewBox="0 0 256 256" aria-hidden="true">
@@ -549,11 +810,11 @@ function FieldMonitorIcon() {
   );
 }
 
-function CameraCard({ camera, fieldId }) {
+function CameraCard({ camera, fieldId, clientSlug = "" }) {
   return (
     <a
       className="group relative grid min-h-[150px] min-w-0 grid-cols-1 gap-4 rounded-[8px] border border-white/5 bg-[#181c1b]/60 p-3 text-left text-white no-underline transition hover:border-[#a4ff00]/60 hover:bg-[#181c1b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#a4ff00] sm:grid-cols-[minmax(8rem,10rem)_minmax(0,1fr)]"
-      href={cameraRoute(fieldId, camera.id)}
+      href={cameraRoute(fieldId, camera.id, clientSlug)}
       aria-label={`Abrir ${camera.name} do Campo ${fieldId}`}
     >
       <img
@@ -579,7 +840,7 @@ function CameraCard({ camera, fieldId }) {
   );
 }
 
-function CampoPage({ fieldId }) {
+function CampoPage({ fieldId, clientSlug = "" }) {
   const [registeredFields, setRegisteredFields] = useState([]);
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
@@ -588,8 +849,8 @@ function CampoPage({ fieldId }) {
     async function loadFieldCameras() {
       setStatus("loading");
       try {
-        const data = await apiRequest("/cameras");
-        setRegisteredFields(buildRegisteredFields(Array.isArray(data) ? data : []));
+        const data = await apiRequest(clientApiPath(clientSlug, "/cameras"));
+        setRegisteredFields(buildRegisteredFields(Array.isArray(data) ? data : [], clientSlug));
         setStatus("ready");
         setError("");
       } catch (requestError) {
@@ -608,10 +869,10 @@ function CampoPage({ fieldId }) {
     <main className="min-h-screen bg-[#0b0f0e] px-4 py-5 font-anybody text-white sm:px-6 lg:px-10 lg:py-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <header className="flex flex-wrap items-center justify-between gap-4" data-purpose="main-header">
-          <a className="flex items-center" href="/" aria-label="Voltar para a Home">
+          <a className="flex items-center" href={clientPath(clientSlug, "/")} aria-label="Voltar para a Home">
             <img alt="Sertao Replay" className="h-11 w-auto object-contain lg:h-14" src="/assets/logo-sertao-replay-nav.png" />
           </a>
-          <a className="inline-flex min-h-10 items-center rounded-full border border-gray-600 px-5 py-2 text-sm font-bold text-gray-300 transition hover:border-[#a4ff00] hover:text-[#a4ff00]" href="/">
+          <a className="inline-flex min-h-10 items-center rounded-full border border-gray-600 px-5 py-2 text-sm font-bold text-gray-300 transition hover:border-[#a4ff00] hover:text-[#a4ff00]" href={clientPath(clientSlug, "/")}>
             Voltar
           </a>
         </header>
@@ -648,7 +909,7 @@ function CampoPage({ fieldId }) {
           {field ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {field.cameras.map((camera) => (
-                <CameraCard camera={camera} fieldId={field.id} key={camera.backendId} />
+                <CameraCard camera={camera} fieldId={field.id} clientSlug={clientSlug} key={camera.backendId} />
               ))}
             </div>
           ) : null}
@@ -809,7 +1070,7 @@ function resolveOperatorCameraId(apiCameras) {
   return candidates.find((candidate) => apiCameras.some((camera) => camera.id === candidate)) || apiCameras[0]?.id || "";
 }
 
-function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
+function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug = "" }) {
   const params = new URLSearchParams(window.location.search);
   const fieldId = routeFieldId || params.get("campo") || "";
   const cameraId = routeCameraId || params.get("camera") || "";
@@ -832,8 +1093,11 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
     async function loadCameraData() {
       setStatus("loading");
       try {
-        const [cameraData, replayData] = await Promise.all([apiRequest("/cameras"), apiRequest("/replays")]);
-        setRegisteredFields(buildRegisteredFields(Array.isArray(cameraData) ? cameraData : []));
+        const [cameraData, replayData] = await Promise.all([
+          apiRequest(clientApiPath(clientSlug, "/cameras")),
+          apiRequest(clientApiPath(clientSlug, "/replays")),
+        ]);
+        setRegisteredFields(buildRegisteredFields(Array.isArray(cameraData) ? cameraData : [], clientSlug));
         setReplays(Array.isArray(replayData) ? replayData : []);
         setStatus("ready");
         setError("");
@@ -846,7 +1110,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
     }
 
     loadCameraData();
-  }, []);
+  }, [clientSlug]);
 
   useEffect(() => {
     if (!cameraReplays.length) {
@@ -862,7 +1126,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
   return (
     <main className="min-h-screen bg-[#0a0f0d] pb-28 text-white lg:pb-10">
       <header className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 bg-[#0a0f0d]/95 px-4 py-4 backdrop-blur-md lg:px-8" data-purpose="main-header">
-        <a className="flex items-center" href="/" aria-label="Voltar para a Home">
+        <a className="flex items-center" href={clientPath(clientSlug, "/")} aria-label="Voltar para a Home">
           <img alt="Sertao Replay" className="h-10 w-auto object-contain lg:h-12" src="/assets/logo-sertao-replay-nav.png" />
         </a>
       </header>
@@ -1090,7 +1354,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId }) {
 
       <footer className="mx-auto mt-6 w-full max-w-md px-4 pb-6 lg:hidden" data-purpose="navigation-footer">
         <div className="mx-auto max-w-md space-y-3">
-          <a className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[#79e043] py-4 font-extrabold text-black no-underline shadow-[0_0_20px_rgba(121,224,67,0.3)] transition active:scale-95" href={field ? field.href : "/"}>
+          <a className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[#79e043] py-4 font-extrabold text-black no-underline shadow-[0_0_20px_rgba(121,224,67,0.3)] transition active:scale-95" href={field ? field.href : clientPath(clientSlug, "/")}>
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M19 12H5m0 0 7 7m-7-7 7-7" />
             </svg>
@@ -1192,7 +1456,7 @@ function StreamingChatPanel({ chatDraft, chatListRef, chatMessages, handleSendCh
   );
 }
 
-function StreamingPage() {
+function StreamingPage({ clientSlug = "" }) {
   const videoRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const hlsRef = useRef(null);
@@ -1213,7 +1477,10 @@ function StreamingPage() {
   useEffect(() => {
     async function loadStreamingData() {
       try {
-        const [cameraData, replayData] = await Promise.all([apiRequest("/cameras"), apiRequest("/replays")]);
+        const [cameraData, replayData] = await Promise.all([
+          apiRequest(clientApiPath(clientSlug, "/cameras")),
+          apiRequest(clientApiPath(clientSlug, "/replays")),
+        ]);
         const enabledCameras = Array.isArray(cameraData) ? cameraData.filter((camera) => camera.enabled !== false) : [];
         setCameras(enabledCameras);
         setReplays(Array.isArray(replayData) ? replayData : []);
@@ -1229,7 +1496,7 @@ function StreamingPage() {
     loadStreamingData();
     const refreshTimer = window.setInterval(loadStreamingData, 10000);
     return () => window.clearInterval(refreshTimer);
-  }, []);
+  }, [clientSlug]);
 
   useEffect(() => {
     try {
@@ -1276,7 +1543,8 @@ function StreamingPage() {
     let cancelled = false;
     async function loadChatMessages() {
       try {
-        const data = await apiRequest(`/chat/messages?camera_id=${encodeURIComponent(selectedCameraId)}&limit=80`);
+        const clientQuery = clientSlug ? `&client_slug=${encodeURIComponent(clientSlug)}` : "";
+        const data = await apiRequest(`/chat/messages?camera_id=${encodeURIComponent(selectedCameraId)}&limit=80${clientQuery}`);
         if (!cancelled && Array.isArray(data)) {
           setChatMessages(data.map(normalizeChatMessage));
         }
@@ -1293,7 +1561,7 @@ function StreamingPage() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [selectedCameraId]);
+  }, [clientSlug, selectedCameraId]);
 
   const isLive = webrtcStatus === "connected" || webrtcStatus === "receiving";
   const streamStatusLabel = isLive ? "Ao vivo" : "Offline";
@@ -1514,6 +1782,7 @@ function StreamingPage() {
       const saved = await apiRequest("/chat/messages", {
         method: "POST",
         body: JSON.stringify({
+          client_slug: clientSlug || null,
           camera_id: selectedCamera?.id || null,
           user,
           text,
@@ -1528,7 +1797,7 @@ function StreamingPage() {
   return (
     <main className="min-h-screen bg-[#101413] px-3 pb-10 pt-20 text-[#e0e3e0] sm:px-4 md:px-8 xl:px-12">
       <nav className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between gap-3 border-b border-[#8ddc00]/30 bg-[#101413]/80 px-3 shadow-[0_0_15px_rgba(141,220,0,0.1)] backdrop-blur-xl sm:px-4 md:px-8 xl:px-12">
-        <a className="flex min-w-0 items-center no-underline transition hover:opacity-90" href="/" aria-label="Sertao Replay - inicio">
+        <a className="flex min-w-0 items-center no-underline transition hover:opacity-90" href={clientPath(clientSlug, "/")} aria-label="Sertao Replay - inicio">
           <img alt="Sertao Replay" className="h-10 w-auto max-w-[min(13rem,55vw)] object-contain sm:h-11" src="/assets/logo-sertao-replay-nav.png" />
         </a>
 
@@ -1537,7 +1806,7 @@ function StreamingPage() {
           <span className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] sm:px-3 sm:text-[11px] sm:tracking-[0.14em] ${isLive ? "bg-[#a1fb00] text-[#102000]" : "bg-[#ff4d4d] text-white"}`}>
             {streamStatusLabel}
           </span>
-          <a className="inline-flex min-h-9 items-center rounded-full border border-[#8ddc00]/40 px-3 py-2 text-xs font-bold text-[#a1fb00] no-underline sm:px-4" href={selectedCamera ? cameraPathFromBackendId(selectedCamera.id) : "/"}>
+          <a className="inline-flex min-h-9 items-center rounded-full border border-[#8ddc00]/40 px-3 py-2 text-xs font-bold text-[#a1fb00] no-underline sm:px-4" href={selectedCamera ? cameraPathFromBackendId(selectedCamera.id, clientSlug) : clientPath(clientSlug, "/")}>
             Camera
           </a>
         </div>
@@ -1917,6 +2186,502 @@ function OperatorPage() {
   );
 }
 
+function AdminLoginPage() {
+  const [email, setEmail] = useState("admin@mvp.test");
+  const [password, setPassword] = useState("admin123");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("Entrando...");
+    try {
+      const data = await apiRequest("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      saveAdminSession(data);
+      window.location.href = `/admin/${encodeURIComponent(data.client.slug)}/dashboard`;
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="admin-login-page">
+      <div className="admin-login-lights" aria-hidden="true" />
+      <div className="admin-login-texture" aria-hidden="true" />
+
+      <section className="admin-login-shell" aria-label="Login administrativo">
+        <div className="admin-login-brand">
+          <img
+            alt="Sertao Replay"
+            className="admin-login-logo"
+            src="/assets/logo-sertao-replay-nav.png"
+          />
+          <div className="admin-login-title">
+            <h1>Painel Admin</h1>
+            <p>Acesso Restrito ao Painel</p>
+          </div>
+        </div>
+
+        <article className="admin-login-card">
+          <div className="admin-login-accent" aria-hidden="true" />
+          <form className="admin-login-form" onSubmit={submit}>
+            <div className="admin-login-field">
+              <label htmlFor="adminLoginEmail">E-mail Administrativo</label>
+              <div className="admin-login-input-row">
+                <UserRound size={20} />
+                <input
+                  id="adminLoginEmail"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="usuario@sertaoreplay.com.br"
+                  type="email"
+                  autoComplete="email"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="admin-login-field">
+              <div className="admin-login-label-row">
+                <label htmlFor="adminLoginPassword">Chave de Acesso</label>
+                <a href="/admin/login">Esqueceu a senha?</a>
+              </div>
+              <div className="admin-login-input-row">
+                <Lock size={20} />
+                <input
+                  id="adminLoginPassword"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="••••••••••••"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                />
+                <button
+                  className="admin-login-visibility"
+                  onClick={() => setShowPassword((current) => !current)}
+                  type="button"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+
+            <button className="admin-login-submit" type="submit" disabled={busy}>
+              {busy ? <Loader2 className="spin" size={24} /> : <LogIn size={24} />}
+              {busy ? "Entrando..." : "Entrar no Painel"}
+            </button>
+
+            <div className="admin-login-security">
+              <ShieldCheck size={16} />
+              <span>Conexão Criptografada SSL</span>
+            </div>
+          </form>
+
+          {message ? (
+            <div className={`admin-login-message ${message === "Entrando..." ? "is-loading" : ""}`}>
+              {message}
+            </div>
+          ) : null}
+        </article>
+
+        <footer className="admin-login-status">
+          <div>
+            <span className="admin-login-dot" />
+            <span>Servidor Online</span>
+          </div>
+          <span>v2.4.0 (Stadium Build)</span>
+        </footer>
+      </section>
+    </main>
+  );
+}
+
+function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
+  const [session, setSession] = useState(() => loadAdminSession());
+  const [dashboard, setDashboard] = useState(null);
+  const [cameras, setCameras] = useState([]);
+  const [replays, setReplays] = useState([]);
+  const [settingsData, setSettingsData] = useState(null);
+  const [message, setMessage] = useState("Carregando admin...");
+  const [busy, setBusy] = useState(false);
+  const [cameraForm, setCameraForm] = useState({
+    id: "",
+    name: "",
+    camera_ip: "",
+  });
+
+  const token = session?.access_token;
+  const client = settingsData || session?.client;
+  const clientSlug = client?.slug || routeClientSlug || "";
+  const adminBase = clientSlug ? `/admin/${clientSlug}` : "/admin";
+  const publicUrl = clientSlug ? `${window.location.origin}/${clientSlug}` : "";
+  const onlineCameras = cameras.filter((camera) => camera.status === "recording").length;
+  const offlineCameras = Math.max(cameras.length - onlineCameras, 0);
+  const publicReplays = replays.filter((replay) => replay.is_public).length;
+  const recentReplays = replays.slice(0, 8);
+  const chartValues = [40, 30, 55, 80, 95, 70, 45, 35, 60, 50, 85, 75];
+
+  useEffect(() => {
+    if (!token) {
+      window.location.href = "/admin/login";
+      return;
+    }
+
+    if (routeClientSlug && session?.client?.slug && routeClientSlug !== session.client.slug) {
+      window.location.href = `/admin/${encodeURIComponent(session.client.slug)}/dashboard`;
+      return;
+    }
+
+    async function loadAdminData() {
+      try {
+        const [dashboardData, cameraData, replayData, settingsResult] = await Promise.all([
+          apiRequest("/admin/dashboard", { bearerToken: token }),
+          apiRequest("/admin/cameras", { bearerToken: token }),
+          apiRequest("/admin/replays", { bearerToken: token }),
+          apiRequest("/admin/settings", { bearerToken: token }),
+        ]);
+        setDashboard(dashboardData);
+        setCameras(Array.isArray(cameraData) ? cameraData : []);
+        setReplays(Array.isArray(replayData) ? replayData : []);
+        setSettingsData(settingsResult);
+        setMessage("Dados carregados.");
+      } catch (error) {
+        setMessage(error.message);
+        if (String(error.message).toLowerCase().includes("login") || String(error.message).toLowerCase().includes("sessao")) {
+          saveAdminSession(null);
+          setSession(null);
+        }
+      }
+    }
+
+    loadAdminData();
+  }, [routeClientSlug, session?.client?.slug, token]);
+
+  function logout() {
+    saveAdminSession(null);
+    window.location.href = "/admin/login";
+  }
+
+  function updateCameraForm(field, value) {
+    setCameraForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function resetCameraForm() {
+    setCameraForm({ id: "", name: "", camera_ip: "" });
+  }
+
+  function editTenantCamera(camera) {
+    setCameraForm({
+      id: camera.id || "",
+      name: camera.name || "",
+      camera_ip: camera.rtsp_url?.match(/rtsp:\/\/(?:[^@]+@)?([^/:]+)/i)?.[1] || "",
+    });
+  }
+
+  async function reloadAdminData() {
+    if (!token) {
+      return;
+    }
+
+    const [dashboardData, cameraData, replayData, settingsResult] = await Promise.all([
+      apiRequest("/admin/dashboard", { bearerToken: token }),
+      apiRequest("/admin/cameras", { bearerToken: token }),
+      apiRequest("/admin/replays", { bearerToken: token }),
+      apiRequest("/admin/settings", { bearerToken: token }),
+    ]);
+    setDashboard(dashboardData);
+    setCameras(Array.isArray(cameraData) ? cameraData : []);
+    setReplays(Array.isArray(replayData) ? replayData : []);
+    setSettingsData(settingsResult);
+  }
+
+  async function saveTenantCamera(event) {
+    event.preventDefault();
+    if (!token) {
+      setMessage("Login admin obrigatorio.");
+      return;
+    }
+
+    const payload = {
+      id: cameraForm.id.trim(),
+      name: cameraForm.name.trim(),
+      camera_ip: cameraForm.camera_ip.trim(),
+    };
+
+    setBusy(true);
+    setMessage("Salvando camera...");
+    try {
+      const saved = await apiRequest("/admin/cameras", {
+        method: "POST",
+        bearerToken: token,
+        body: JSON.stringify(payload),
+      });
+      setMessage(`Camera ${saved.name} salva no cliente ${client?.name || session?.client?.name || ""}.`);
+      resetCameraForm();
+      await reloadAdminData();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function exportAdminData() {
+    const payload = {
+      client,
+      dashboard,
+      cameras,
+      replays,
+      exported_at: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${clientSlug || "sertao-replay"}-admin-export.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const navItems = [
+    { href: `${adminBase}/dashboard`, label: "Inicio", icon: Home, key: "dashboard" },
+  ];
+
+  return (
+    <main className="tenant-admin-page">
+      <header className="tenant-admin-topbar">
+        <div className="tenant-admin-topbar-inner">
+          <div className="tenant-admin-brand">
+            <button className="tenant-admin-icon-button" type="button" aria-label="Menu">
+              <Menu size={22} />
+            </button>
+            <a href={`${adminBase}/dashboard`} className="tenant-admin-logo-link" aria-label="Sertao Replay admin">
+              <img alt="Sertao Replay" src="/assets/logo-sertao-replay-nav.png" />
+              <span>Sertao Replay</span>
+            </a>
+          </div>
+
+          <nav className="tenant-admin-desktop-nav" aria-label="Admin do cliente">
+            {navItems.map((item) => (
+              <a className={view === item.key ? "is-active" : ""} href={item.href} key={item.key}>{item.label}</a>
+            ))}
+          </nav>
+
+          <button className="tenant-admin-avatar" onClick={logout} type="button" title="Sair">
+            {(session?.user?.name || "Admin").slice(0, 2).toUpperCase()}
+          </button>
+        </div>
+      </header>
+
+      <section className="tenant-admin-shell">
+        <div className="tenant-admin-heading">
+          <div>
+            <span>Visao geral do sistema</span>
+            <h1>Painel Admin</h1>
+            <p>{client?.name || "Cliente"} · {clientSlug || "tenant"}</p>
+          </div>
+          <div className="tenant-admin-heading-actions">
+            <a className="tenant-admin-secondary" href={publicUrl || "/"} target="_blank" rel="noreferrer">Pagina publica</a>
+            <button className="tenant-admin-primary" onClick={exportAdminData} type="button">Exportar dados</button>
+          </div>
+        </div>
+
+        {message ? <div className="tenant-admin-message">{message}</div> : null}
+
+        <section className="tenant-admin-metrics">
+          <article className="tenant-admin-card tenant-admin-camera-card">
+            <div className="tenant-admin-card-top">
+              <div className="tenant-admin-card-icon"><Video size={24} /></div>
+              <span>Total de cameras</span>
+            </div>
+            <div>
+              <div className="tenant-admin-big-number">
+                <strong>{dashboard?.cameras_total ?? cameras.length}</strong>
+                <span>Unidades conectadas</span>
+              </div>
+              <div className="tenant-admin-split-status">
+                <span><i className="is-online" />{onlineCameras} online</span>
+                <span><i className="is-offline" />{offlineCameras} offline</span>
+              </div>
+            </div>
+          </article>
+
+          <article className="tenant-admin-card">
+            <div className="tenant-admin-card-top">
+              <div className="tenant-admin-card-icon"><History size={24} /></div>
+              <span>Replays</span>
+            </div>
+            <div>
+              <strong className="tenant-admin-stat">{dashboard?.replays_total ?? replays.length}</strong>
+              <p><TrendingUp size={15} /> {publicReplays} publicos</p>
+            </div>
+          </article>
+
+          <article className="tenant-admin-card">
+            <div className="tenant-admin-card-top">
+              <div className="tenant-admin-card-icon"><Users size={24} /></div>
+              <span>Cliente</span>
+            </div>
+            <div>
+              <strong className="tenant-admin-stat">{client?.plan || "starter"}</strong>
+              <p><Activity size={15} /> Ao vivo</p>
+            </div>
+          </article>
+        </section>
+
+        <section className="tenant-admin-main-grid tenant-admin-main-grid-single">
+          <article className="tenant-admin-card tenant-admin-chart-card">
+            <div className="tenant-admin-section-head">
+              <div>
+                <h2>Atividade de geracao de replays</h2>
+                <p>Ultimas 24 horas</p>
+              </div>
+              <select aria-label="Periodo do grafico">
+                <option>Ultimas 24h</option>
+                <option>Ultimos 7 dias</option>
+              </select>
+            </div>
+            <div className="tenant-admin-chart" aria-label="Grafico de atividade">
+              {chartValues.map((height, index) => (
+                <span className={index === 4 ? "is-hot" : ""} style={{ height: `${height}%` }} key={`${height}-${index}`} />
+              ))}
+            </div>
+            <div className="tenant-admin-chart-labels">
+              <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:59</span>
+            </div>
+          </article>
+
+        </section>
+
+        {(view === "dashboard" || view === "replays") ? (
+          <section className="tenant-admin-card tenant-admin-table-card">
+            <div className="tenant-admin-section-head">
+              <h2>Replays recentes</h2>
+              <button onClick={reloadAdminData} type="button"><RotateCcw size={18} />Atualizar</button>
+            </div>
+            <div className="tenant-admin-table-wrap">
+              <table className="tenant-admin-table">
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>ID da camera</th>
+                    <th>Evento</th>
+                    <th>Horario</th>
+                    <th>Duracao</th>
+                    <th>Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentReplays.map((replay) => (
+                    <tr key={replay.id}>
+                      <td><span className={`tenant-admin-badge ${replay.status === "ready" ? "is-success" : "is-error"}`}>{replay.status || "ready"}</span></td>
+                      <td>{replay.camera_id}</td>
+                      <td>{replayTitle(replay)}</td>
+                      <td>{formatDate(replay.created_at)}</td>
+                      <td>{replay.duration || replay.seconds || 15}s</td>
+                      <td>
+                        {replay.video_url ? <a href={mediaUrl(replay.video_url)} target="_blank" rel="noreferrer" aria-label="Ver replay"><Eye size={18} /></a> : null}
+                        {replay.video_url ? <a href={mediaUrl(replay.download_url || replay.video_url)} download aria-label="Baixar replay"><Download size={18} /></a> : null}
+                      </td>
+                    </tr>
+                  ))}
+                  {!recentReplays.length ? (
+                    <tr><td colSpan="6">Nenhum replay do cliente ainda.</td></tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
+
+        {view === "dashboard" ? (
+          <section className="tenant-admin-camera-admin">
+            <article className="tenant-admin-card tenant-admin-form-card">
+              <div className="tenant-admin-section-head">
+                <div>
+                  <h2>Adicionar camera</h2>
+                  <p>Informe ID, nome e IP. A API descobre e valida o caminho RTSP.</p>
+                </div>
+              </div>
+              <form className="tenant-admin-form" onSubmit={saveTenantCamera}>
+                <label htmlFor="tenantCameraId">ID da camera</label>
+                <input
+                  id="tenantCameraId"
+                  value={cameraForm.id}
+                  onChange={(event) => updateCameraForm("id", event.target.value)}
+                  placeholder="campo-01"
+                  required
+                />
+
+                <label htmlFor="tenantCameraName">Nome da camera</label>
+                <input
+                  id="tenantCameraName"
+                  value={cameraForm.name}
+                  onChange={(event) => updateCameraForm("name", event.target.value)}
+                  placeholder="Campo 01"
+                  required
+                />
+
+                <label htmlFor="tenantCameraIp">IP da camera</label>
+                <input
+                  id="tenantCameraIp"
+                  value={cameraForm.camera_ip}
+                  onChange={(event) => updateCameraForm("camera_ip", event.target.value)}
+                  placeholder="192.168.0.6"
+                  inputMode="decimal"
+                  required
+                />
+
+                <div className="tenant-admin-form-actions">
+                  <button className="tenant-admin-primary" type="submit" disabled={busy}>{busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />} Salvar camera</button>
+                </div>
+              </form>
+            </article>
+
+            <article className="tenant-admin-card tenant-admin-camera-list-card">
+              <div className="tenant-admin-section-head">
+                <h2>Cameras cadastradas</h2>
+                <button onClick={reloadAdminData} type="button"><RotateCcw size={18} />Atualizar</button>
+              </div>
+              <div className="tenant-admin-camera-list">
+                {cameras.map((camera) => (
+                  <button className="tenant-admin-camera-row" onClick={() => editTenantCamera(camera)} type="button" key={camera.id}>
+                    <span><strong>{camera.name}</strong><small>{camera.id} · /{clientSlug}/campo/{camera.slug || camera.id}</small></span>
+                    <em className={camera.status === "recording" ? "is-online" : "is-offline"}>{camera.status || "unknown"}</em>
+                  </button>
+                ))}
+                {!cameras.length ? <p>Nenhuma camera cadastrada para este cliente.</p> : null}
+              </div>
+            </article>
+          </section>
+        ) : null}
+
+      </section>
+
+      <nav className="tenant-admin-bottom-nav" aria-label="Admin mobile">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <a className={view === item.key ? "is-active" : ""} href={item.href} key={item.key}>
+              <Icon size={21} />
+              <span>{item.label}</span>
+            </a>
+          );
+        })}
+      </nav>
+    </main>
+  );
+}
+
 function AdminPage() {
   const [token, setToken] = useState(() => localStorage.getItem(OPERATOR_TOKEN_KEY) || "");
   const [cameras, setCameras] = useState([]);
@@ -2230,8 +2995,78 @@ function AdminPage() {
 }
 
 export default function App() {
+  const path = window.location.pathname;
+  const tenantAdminMatch = path.match(/^\/admin\/([^/]+)(?:\/(dashboard))?\/?$/);
+  const tenantAliasMatch = path.match(/^\/a\/([^/]+)(?:\/(.*))?$/);
+  const reservedRootMatch = path.match(/^\/([^/]+)(?:\/(.*))?$/);
+  const reservedRoots = new Set(["admin", "api", "assets", "camera", "streaming", "teste", "highlights", "highlight", "higliyhet", "torneio", "tournaments", "tournament", "favicon.ico"]);
+  const directClientMatch =
+    reservedRootMatch && !reservedRoots.has(reservedRootMatch[1].toLowerCase()) && !/^campo\d+$/i.test(reservedRootMatch[1])
+      ? reservedRootMatch
+      : null;
+  const clientRouteMatch = tenantAliasMatch || directClientMatch;
+
+  if (clientRouteMatch) {
+    const clientSlug = clientRouteMatch[1];
+    const route = (clientRouteMatch[2] || "").replace(/^\/+|\/+$/g, "");
+    const lowerRoute = route.toLowerCase();
+    const clientCameraRouteMatch = route.match(/^campo(\d+)\/camera(\d+)$/i);
+    const clientFieldMatch = route.match(/^campo(\d+)$/i);
+
+    if (!route) {
+      return <HomePage clientSlug={clientSlug} />;
+    }
+
+    if (lowerRoute === "streaming") {
+      return <StreamingPage clientSlug={clientSlug} />;
+    }
+
+    if (["highlights", "highlight", "higliyhet"].includes(lowerRoute)) {
+      return <HomePage clientSlug={clientSlug} section="highlights" />;
+    }
+
+    if (["torneio", "tournaments", "tournament"].includes(lowerRoute)) {
+      return <HomePage clientSlug={clientSlug} section="torneio" />;
+    }
+
+    if (clientCameraRouteMatch) {
+      return <CameraPage fieldId={clientCameraRouteMatch[1]} cameraId={clientCameraRouteMatch[2]} clientSlug={clientSlug} />;
+    }
+
+    if (clientFieldMatch) {
+      return <CampoPage fieldId={clientFieldMatch[1]} clientSlug={clientSlug} />;
+    }
+  }
+
+  const tenantReplayMatch = window.location.pathname.match(/^\/a\/([^/]+)\/replay\/([^/]+)\/?$/);
+  const tenantCameraMatch = window.location.pathname.match(/^\/a\/([^/]+)\/campo\/([^/]+)\/?$/);
+  const tenantMatch = window.location.pathname.match(/^\/a\/([^/]+)\/?$/);
   const cameraRouteMatch = window.location.pathname.match(/^\/campo(\d+)\/camera(\d+)\/?$/);
   const fieldMatch = window.location.pathname.match(/^\/campo(\d+)\/?$/);
+
+  if (
+    tenantAdminMatch
+    && !["login", "dashboard"].includes(tenantAdminMatch[1])
+  ) {
+    return <AdminTenantPage routeClientSlug={tenantAdminMatch[1]} view={tenantAdminMatch[2] || "dashboard"} />;
+  }
+
+  const removedTenantAdminRoute = path.match(/^\/admin\/([^/]+)\/(?:cameras|replays|settings)\/?$/);
+  if (removedTenantAdminRoute) {
+    return <AdminTenantPage routeClientSlug={removedTenantAdminRoute[1]} view="dashboard" />;
+  }
+
+  if (tenantReplayMatch) {
+    return <PublicReplayPage slug={tenantReplayMatch[1]} replayId={tenantReplayMatch[2]} />;
+  }
+
+  if (tenantCameraMatch) {
+    return <PublicCameraPage slug={tenantCameraMatch[1]} cameraSlug={tenantCameraMatch[2]} />;
+  }
+
+  if (tenantMatch) {
+    return <PublicTenantPage slug={tenantMatch[1]} />;
+  }
 
   if (cameraRouteMatch) {
     return <CameraPage fieldId={cameraRouteMatch[1]} cameraId={cameraRouteMatch[2]} />;
@@ -2245,12 +3080,28 @@ export default function App() {
     return <CampoPage fieldId={fieldMatch[1]} />;
   }
 
+  if (window.location.pathname.startsWith("/admin/login")) {
+    return <AdminLoginPage />;
+  }
+
+  if (window.location.pathname.startsWith("/admin/dashboard")) {
+    return <AdminTenantPage view="dashboard" />;
+  }
+
   if (window.location.pathname.startsWith("/admin")) {
     return <AdminPage />;
   }
 
   if (window.location.pathname.startsWith("/streaming")) {
     return <StreamingPage />;
+  }
+
+  if (["/highlights", "/highlight", "/higliyhet"].some((route) => window.location.pathname.startsWith(route))) {
+    return <HomePage section="highlights" />;
+  }
+
+  if (["/torneio", "/tournaments", "/tournament"].some((route) => window.location.pathname.startsWith(route))) {
+    return <HomePage section="torneio" />;
   }
 
   if (window.location.pathname.startsWith("/teste")) {
