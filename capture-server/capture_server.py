@@ -1,9 +1,11 @@
 import logging
 import math
 import os
+import signal
 import re
 import shutil
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -49,7 +51,10 @@ class CaptureServer:
         self.rtsp_transport_index = 0
         self.buffer_video_codec = os.getenv("BUFFER_VIDEO_CODEC", "libx264").strip() or "libx264"
         self.buffer_fps = int(os.getenv("BUFFER_FPS", "30"))
+        self.buffer_audio_codec = os.getenv("BUFFER_AUDIO_CODEC", "aac").strip() or "aac"
         self.replay_video_codec = os.getenv("REPLAY_VIDEO_CODEC", "libx264").strip() or "libx264"
+        self.replay_audio_codec = os.getenv("REPLAY_AUDIO_CODEC", "aac").strip() or "aac"
+        self.enable_replay_audio = os.getenv("ENABLE_REPLAY_AUDIO", "true").strip().lower() not in {"0", "false", "no"}
         self.fast_replay_copy = os.getenv("FAST_REPLAY_COPY", "true").strip().lower() not in {"0", "false", "no"}
         self.default_replay_seconds = int(os.getenv("DEFAULT_REPLAY_SECONDS", "15"))
         self.segment_time_seconds = int(os.getenv("SEGMENT_TIME_SECONDS", "2"))
@@ -60,6 +65,7 @@ class CaptureServer:
         self.buffer_dir = self.storage_root / "buffer" / self.camera_id
         self.output_dir = self.storage_root / "replays"
         self.snapshot_dir = self.storage_root / "snapshots"
+        self.instance_lock_path = self.storage_root / f"capture_{self.camera_id}.lock"
         self.ffmpeg = shutil.which(os.getenv("FFMPEG_BIN", "ffmpeg"))
         self.ffprobe = shutil.which(os.getenv("FFPROBE_BIN", "ffprobe"))
         self.process: subprocess.Popen | None = None
@@ -68,6 +74,11 @@ class CaptureServer:
         self.last_reported_status: str | None = None
         self.last_status_report_at = 0.0
         self.last_snapshot_upload_at = 0.0
+        self.hotkey_replay_enabled = os.getenv("HOTKEY_REPLAY_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
+        self.hotkey_replay_seconds_default = int(os.getenv("HOTKEY_REPLAY_DEFAULT_SECONDS", str(self.default_replay_seconds)))
+        self.hotkey_replay_debounce_ms = int(os.getenv("HOTKEY_REPLAY_DEBOUNCE_MS", "800"))
+        self.hotkey_last_press_at = 0.0
+        self.hotkey_thread_started = False
         self.session = requests.Session()
         if self.operator_token:
             self.session.headers.update({"X-Operator-Token": self.operator_token})
@@ -83,9 +94,11 @@ class CaptureServer:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.snapshot_dir.mkdir(parents=True, exist_ok=True)
         self.ffmpeg_log_path.parent.mkdir(parents=True, exist_ok=True)
+        self.acquire_instance_lock()
 
     def run(self) -> None:
         logging.info("Capture-server iniciado para client_id=%s camera_id=%s", self.client_id or "default", self.camera_id)
+        self.start_hotkey_listener()
         self.register_camera()
         self.load_remote_camera_config()
         logging.info("RTSP local configurado: %s", redact(self.local_rtsp_url))
@@ -97,6 +110,84 @@ class CaptureServer:
             self.upload_live_snapshot()
             self.poll_pending_requests()
             time.sleep(self.poll_interval_seconds)
+
+    def acquire_instance_lock(self) -> None:
+        current_pid = os.getpid()
+        if self.instance_lock_path.exists():
+            try:
+                existing_pid = int(self.instance_lock_path.read_text(encoding="utf-8").strip() or "0")
+            except ValueError:
+                existing_pid = 0
+            if existing_pid and self.process_alive(existing_pid):
+                raise RuntimeError(
+                    f"Ja existe capture-server ativo para esta camera (PID {existing_pid}). Pare o processo antigo antes de iniciar outro."
+                )
+        self.instance_lock_path.write_text(str(current_pid), encoding="utf-8")
+
+    @staticmethod
+    def process_alive(pid: int) -> bool:
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        return True
+
+    def start_hotkey_listener(self) -> None:
+        if not self.hotkey_replay_enabled:
+            logging.info("Hotkeys do replay desativadas por HOTKEY_REPLAY_ENABLED.")
+            return
+
+        if os.name != "nt":
+            logging.info("Hotkeys globais suportadas apenas no Windows neste modo.")
+            return
+
+        if self.hotkey_thread_started:
+            return
+
+        def hotkey_worker() -> None:
+            try:
+                import keyboard  # type: ignore
+            except Exception as exc:  # pragma: no cover - depends on local env
+                logging.warning("Nao foi possivel iniciar captura de hotkeys: %s", exc)
+                return
+
+            def bind(shortcut: str, seconds: int) -> None:
+                keyboard.add_hotkey(shortcut, lambda: self.request_replay_from_hotkey(seconds))
+
+            bind("ctrl+alt+1", 10)
+            bind("ctrl+alt+2", 15)
+            bind("ctrl+alt+3", 30)
+            bind("ctrl+alt+r", self.hotkey_replay_seconds_default)
+            logging.info("Hotkeys ativas: Ctrl+Alt+1/2/3/R para replay.")
+            keyboard.wait()
+
+        thread = threading.Thread(target=hotkey_worker, name="hotkey-listener", daemon=True)
+        thread.start()
+        self.hotkey_thread_started = True
+
+    def request_replay_from_hotkey(self, seconds: int) -> None:
+        now_ms = time.time() * 1000
+        if now_ms - self.hotkey_last_press_at < self.hotkey_replay_debounce_ms:
+            return
+        self.hotkey_last_press_at = now_ms
+
+        safe_seconds = max(2, min(120, int(seconds)))
+        payload = {
+            "camera_id": self.camera_id,
+            "seconds": safe_seconds,
+            "label": f"Replay {safe_seconds}s - Arduino",
+        }
+        try:
+            if self.client_slug:
+                response = self.post_json(f"/public/clients/{self.client_slug}/replay-requests", payload)
+            else:
+                response = self.post_json("/replay-requests", payload)
+            request_id = response.get("id")
+            logging.info("Replay solicitado por hotkey. request_id=%s seconds=%s", request_id, safe_seconds)
+            self.send_log("info", f"Hotkey solicitou replay {safe_seconds}s (request_id={request_id}).")
+        except Exception as exc:
+            logging.warning("Falha ao solicitar replay por hotkey: %s", exc)
+            self.send_log("error", f"Falha hotkey replay: {redact(str(exc))}")
 
     def register_camera(self) -> None:
         payload = {
@@ -147,12 +238,14 @@ class CaptureServer:
             "+genpts+discardcorrupt",
             "-err_detect",
             "ignore_err",
-            "-use_wallclock_as_timestamps",
-            "1",
             "-i",
             self.local_rtsp_url,
-            "-an",
+            "-map",
+            "0:v:0",
         ]
+
+        if self.enable_replay_audio:
+            command.extend(["-map", "0:a:0?"])
 
         if self.buffer_video_codec.lower() == "copy":
             command.extend(["-c:v", "copy"])
@@ -175,6 +268,20 @@ class CaptureServer:
                     "0",
                     "-pix_fmt",
                     "yuv420p",
+                ]
+            )
+
+        if self.enable_replay_audio:
+            command.extend(
+                [
+                    "-af",
+                    "aresample=async=1:first_pts=0,asetpts=N/SR/TB",
+                    "-c:a",
+                    self.buffer_audio_codec,
+                    "-ar",
+                    "48000",
+                    "-b:a",
+                    "128k",
                 ]
             )
 
@@ -288,6 +395,10 @@ class CaptureServer:
             "-hide_banner",
             "-nostdin",
             "-y",
+            "-fflags",
+            "+genpts",
+            "-avoid_negative_ts",
+            "make_zero",
             "-f",
             "concat",
             "-safe",
@@ -296,8 +407,14 @@ class CaptureServer:
             str(concat_file),
             "-t",
             str(seconds),
-            "-an",
+            "-map",
+            "0:v:0",
         ]
+
+        if self.enable_replay_audio:
+            command.extend(["-map", "0:a:0?"])
+        else:
+            command.extend(["-an"])
 
         if self.fast_replay_copy:
             command.extend(["-c:v", "copy"])
@@ -306,16 +423,50 @@ class CaptureServer:
                 [
                     "-vf",
                     f"trim=duration={seconds},setpts=PTS-STARTPTS,fps=30",
+                    "-vsync",
+                    "cfr",
+                    "-r",
+                    "30",
                     "-c:v",
                     self.replay_video_codec,
                     "-preset",
                     "veryfast",
+                    "-g",
+                    "60",
+                    "-keyint_min",
+                    "60",
+                    "-sc_threshold",
+                    "0",
                     "-pix_fmt",
                     "yuv420p",
                 ]
             )
 
-        command.extend(["-movflags", "+faststart", str(output_file)])
+        if self.enable_replay_audio:
+            command.extend(
+                [
+                    "-af",
+                    "aresample=async=1:first_pts=0",
+                    "-c:a",
+                    self.replay_audio_codec,
+                    "-ar",
+                    "48000",
+                    "-b:a",
+                    "128k",
+                ]
+            )
+
+        command.extend(
+            [
+                "-max_interleave_delta",
+                "0",
+                "-movflags",
+                "+faststart",
+                "-video_track_timescale",
+                "90000",
+                str(output_file),
+            ]
+        )
         result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=max(60, seconds + 30))
         concat_file.unlink(missing_ok=True)
 

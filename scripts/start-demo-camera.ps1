@@ -122,7 +122,7 @@ if ($rtspListener) {
 }
 
 Write-Step "Publicando MP4 como camera RTSP"
-$ffmpegArgs = "-hide_banner -loglevel warning -re -stream_loop -1 -i `"$VideoPath`" -an -vf `"scale=1280:-2,fps=30`" -c:v libx264 -preset veryfast -tune zerolatency -pix_fmt yuv420p -f rtsp -rtsp_transport tcp `"$rtspUrl`""
+$ffmpegArgs = "-hide_banner -loglevel warning -re -stream_loop -1 -fflags +genpts -avoid_negative_ts make_zero -i `"$VideoPath`" -map 0:v:0 -map 0:a:0? -vf `"scale=1280:-2,fps=30`" -af `"aresample=async=1:first_pts=0,asetpts=N/SR/TB`" -c:v libx264 -preset veryfast -tune zerolatency -pix_fmt yuv420p -c:a aac -ar 48000 -b:a 128k -f rtsp -rtsp_transport tcp `"$rtspUrl`""
 $ffmpeg = Start-Process -FilePath "ffmpeg" -ArgumentList $ffmpegArgs -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logDir "ffmpeg-camera.out.log") -RedirectStandardError (Join-Path $logDir "ffmpeg-camera.err.log")
 Start-Sleep -Seconds 4
 if ($ffmpeg.HasExited) {
@@ -178,9 +178,11 @@ RTSP_TRANSPORT=tcp
 BUFFER_VIDEO_CODEC=libx264
 BUFFER_FPS=30
 REPLAY_VIDEO_CODEC=libx264
+REPLAY_AUDIO_CODEC=aac
+ENABLE_REPLAY_AUDIO=true
 FAST_REPLAY_COPY=false
-SEGMENT_TIME_SECONDS=1
-SEGMENT_WRAP_COUNT=180
+SEGMENT_TIME_SECONDS=2
+SEGMENT_WRAP_COUNT=120
 POLL_INTERVAL_SECONDS=1
 SNAPSHOT_INTERVAL_SECONDS=2
 STORAGE_ROOT=$($storageDir.Replace('\','/'))

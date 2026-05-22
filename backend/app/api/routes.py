@@ -71,6 +71,9 @@ class SuperAdminClientPayload(BaseModel):
     admin_email: str = Field(min_length=3, max_length=180)
     admin_password: str = Field(min_length=6, max_length=200)
     is_active: bool = True
+    initial_field_name: str | None = Field(default=None, max_length=120)
+    initial_camera_number: int = Field(default=1, ge=1, le=4)
+    initial_camera_ip: str | None = Field(default=None, max_length=500)
 
 
 class SuperAdminClientUpdate(BaseModel):
@@ -531,6 +534,50 @@ def create_super_admin_client(payload: SuperAdminClientPayload, db: Session = De
             role="admin",
         )
     )
+
+    # Cria campos padrao para o cliente (Campo 1..4 com Camera 1),
+    # assim o admin so precisa editar IP/camera em vez de criar do zero.
+    for field_number in range(1, 5):
+        field_id = f"{field_number:02d}"
+        camera_id = f"campo-{field_id}-camera-01"
+        db.add(
+            CameraConfig(
+                id=camera_id,
+                client_id=client.id,
+                name=f"Campo {field_number} - Camera 1",
+                slug=camera_id,
+                rtsp_url=None,
+                status="unknown",
+                enabled=True,
+                notes="Campo padrao criado automaticamente no cadastro do cliente.",
+            )
+        )
+
+    field_name = (payload.initial_field_name or "").strip()
+    camera_ip = (payload.initial_camera_ip or "").strip()
+    if field_name and camera_ip:
+        camera_suffix = str(payload.initial_camera_number).zfill(2)
+        camera_id = f"campo-01-camera-{camera_suffix}"
+        rtsp_url = camera_ip
+        if not camera_ip.lower().startswith("rtsp://"):
+            try:
+                rtsp_url = camera_service.discover_rtsp_url(camera_ip)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        db.add(
+            CameraConfig(
+                id=camera_id,
+                client_id=client.id,
+                name=f"{field_name} - Camera {payload.initial_camera_number}",
+                slug=camera_id,
+                rtsp_url=rtsp_url,
+                status="unknown",
+                enabled=True,
+                notes=f"Camera inicial criada no cadastro do cliente. Campo: {field_name}.",
+            )
+        )
+
     db.commit()
     db.refresh(client)
     return _client_admin_response(db, client)
@@ -587,7 +634,7 @@ def delete_super_admin_client(
     if client.id == _default_client_id() and not force:
         raise HTTPException(status_code=400, detail="Cliente padrao nao pode ser excluido sem force=true.")
 
-    for model in (ReplayRequestQueue, ReplayEvent, ChatMessage, SystemLog, CameraConfig, Replay, User):
+    for model in (ReplayRequestQueue, ReplayEvent, ChatMessage, SystemLog, Replay, CameraConfig, User):
         db.query(model).filter(model.client_id == client.id).delete(synchronize_session=False)
     db.delete(client)
     db.commit()
