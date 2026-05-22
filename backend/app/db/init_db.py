@@ -204,3 +204,12 @@ def _seed_demo_tenants() -> None:
 def _move_operational_data_to_mvp(db) -> None:
     for model in (CameraConfig, Replay, ReplayRequestQueue, ReplayEvent, ChatMessage, SystemLog):
         db.query(model).update({"client_id": "mvp"}, synchronize_session=False)
+
+    camera = db.get(CameraConfig, "campo-01")
+    if camera:
+        camera.client_id = "mvp"
+        camera.name = "Campo 01"
+        camera.slug = "campo-01"
+        camera.rtsp_url = "rtsp://192.168.0.9:554/"
+        camera.enabled = True
+        camera.notes = "Camera principal do MVP."

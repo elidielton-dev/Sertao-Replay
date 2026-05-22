@@ -1,4 +1,5 @@
 from pathlib import Path
+import ipaddress
 import socket
 from urllib.parse import urlsplit
 
@@ -129,7 +130,24 @@ class CameraService:
                 errors.append(str(exc))
 
         detail = errors[-1] if errors else "nenhum caminho RTSP respondeu"
+        if self._is_private_camera_host(host):
+            fallback_url = f"rtsp://{host}:{port}/"
+            logger.warning(
+                "RTSP privado nao validado pelo backend remoto; usando fallback. host=%s detail=%s",
+                host,
+                detail,
+            )
+            return fallback_url
+
         raise ValueError(f"Nao foi possivel validar RTSP para {camera_ip}: {detail}.")
+
+    def _is_private_camera_host(self, host: str) -> bool:
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            return False
+
+        return address.is_private or address.is_loopback or address.is_link_local
 
     def _parse_camera_host(self, camera_ip: str) -> tuple[str, int]:
         value = camera_ip.strip()
