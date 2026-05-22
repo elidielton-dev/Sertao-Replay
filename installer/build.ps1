@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $app = Join-Path $PSScriptRoot "app\main.py"
 $capture = Join-Path $root "capture-server\capture_server.py"
-$logo = Join-Path $root "frontend\public\assets\logo-sertao-replay-nav.png"
+$logo = Join-Path $root "frontend\public\assets\logo-sertao-replay.png"
 $icon = Join-Path $PSScriptRoot "assets\sertao-replay.ico"
 
 python -m pip install pyinstaller customtkinter requests

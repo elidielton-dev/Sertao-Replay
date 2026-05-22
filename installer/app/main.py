@@ -78,7 +78,7 @@ def resource_path(relative: str) -> Path:
 
 
 def logo_path() -> Path:
-    return resource_path("logo-sertao-replay-nav.png")
+    return resource_path("logo-sertao-replay.png")
 
 
 def icon_path() -> Path:

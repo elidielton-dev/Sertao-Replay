@@ -79,6 +79,39 @@ function generateClientPassword() {
   return password;
 }
 
+async function copyTextToClipboard(value) {
+  const text = String(value || "");
+  if (!text || typeof document === "undefined") {
+    return false;
+  }
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Some browsers block the async clipboard API even on user clicks.
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+
+  try {
+    return document.execCommand("copy");
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
 function formatDate(value) {
   if (!value) {
     return "Data indisponivel";
@@ -1401,6 +1434,11 @@ const STREAM_CHAT_STORAGE_KEY = "sertao_stream_chat_messages";
 const STREAM_CHAT_USER_KEY = "sertao_stream_chat_user";
 const STREAM_CHAT_USER = "Atleta";
 
+function streamChatUserKey(clientSlug = "") {
+  const slugKey = String(clientSlug || "global").trim().toLowerCase() || "global";
+  return `${STREAM_CHAT_USER_KEY}_${slugKey}`;
+}
+
 function chatInitials(name) {
   const parts = String(name || "Torcedor")
     .trim()
@@ -1424,13 +1462,15 @@ function loadStoredChatMessages() {
   }
 }
 
-function loadStoredChatUser() {
+function loadStoredChatUser(clientSlug = "") {
   if (typeof window === "undefined") {
     return "";
   }
 
-  const storedUser = (window.localStorage.getItem(STREAM_CHAT_USER_KEY) || "").trim();
+  const tenantKey = streamChatUserKey(clientSlug);
+  const storedUser = (window.localStorage.getItem(tenantKey) || "").trim();
   if (!storedUser || storedUser.toLowerCase() === "admin") {
+    window.localStorage.removeItem(tenantKey);
     window.localStorage.removeItem(STREAM_CHAT_USER_KEY);
     return "";
   }
@@ -1527,9 +1567,9 @@ function StreamingPage({ clientSlug = "" }) {
   const [webrtcConfigVersion, setWebrtcConfigVersion] = useState(0);
   const [chatMessages, setChatMessages] = useState(() => loadStoredChatMessages());
   const [chatDraft, setChatDraft] = useState("");
-  const [chatUserName, setChatUserName] = useState(() => loadStoredChatUser());
-  const [chatNameDraft, setChatNameDraft] = useState(() => loadStoredChatUser());
-  const [showChatNameModal, setShowChatNameModal] = useState(() => !loadStoredChatUser());
+  const [chatUserName, setChatUserName] = useState(() => loadStoredChatUser(clientSlug));
+  const [chatNameDraft, setChatNameDraft] = useState(() => loadStoredChatUser(clientSlug));
+  const [showChatNameModal, setShowChatNameModal] = useState(() => !loadStoredChatUser(clientSlug));
   const [previewReplayId, setPreviewReplayId] = useState("");
 
   function saveChatUserName(name) {
@@ -1537,8 +1577,15 @@ function StreamingPage({ clientSlug = "" }) {
     setChatUserName(safeName);
     setChatNameDraft(safeName);
     setShowChatNameModal(false);
-    window.localStorage.setItem(STREAM_CHAT_USER_KEY, safeName);
+    window.localStorage.setItem(streamChatUserKey(clientSlug), safeName);
   }
+
+  useEffect(() => {
+    const storedUser = loadStoredChatUser(clientSlug);
+    setChatUserName(storedUser);
+    setChatNameDraft(storedUser);
+    setShowChatNameModal(!storedUser);
+  }, [clientSlug]);
 
   useEffect(() => {
     async function loadStreamingData() {
@@ -2827,7 +2874,7 @@ function SuperAdminPage() {
   const totalReplays = clients.reduce((total, client) => total + Number(client.replays_total || 0), 0);
   const totalAdmins = clients.reduce((total, client) => total + Number(client.users?.length || 0), 0);
   const selectedAdmin = selectedClient?.users?.[0] || null;
-  const selectedPassword = selectedClient ? clientCredentials[selectedClient.id] : "";
+  const selectedPassword = selectedClient ? selectedAdmin?.plain_password || clientCredentials[selectedClient.id] || "" : "";
   const isSuperAuthenticated = Boolean(superSession && tokenValue());
 
   function tokenValue() {
@@ -2853,11 +2900,11 @@ function SuperAdminPage() {
       return;
     }
 
-    try {
-      await navigator.clipboard.writeText(value);
+    const copied = await copyTextToClipboard(value);
+    if (copied) {
       setMessage("Chave de instalacao copiada.");
       setCopyNotice("Chave do instalador copiada.");
-    } catch {
+    } else {
       setMessage(`Chave de instalacao: ${value}`);
       setCopyNotice(`Copie manualmente a chave: ${value}`);
     }
@@ -2878,11 +2925,11 @@ function SuperAdminPage() {
       return;
     }
 
-    try {
-      await navigator.clipboard.writeText(value);
+    const copied = await copyTextToClipboard(value);
+    if (copied) {
       setMessage("Senha do cliente copiada.");
       setCopyNotice("Senha do cliente copiada.");
-    } catch {
+    } else {
       setMessage(`Senha do cliente: ${value}`);
       setCopyNotice(`Copie manualmente a senha: ${value}`);
     }

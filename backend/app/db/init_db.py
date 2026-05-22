@@ -41,6 +41,8 @@ def _run_lightweight_migrations() -> None:
             connection.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS document VARCHAR(80)"))
             connection.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS address VARCHAR(500)"))
             connection.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS install_key VARCHAR(80) UNIQUE"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password VARCHAR(200)"))
+            connection.execute(text("UPDATE users SET plain_password = 'admin123' WHERE id IN ('admin-mvp', 'admin-custodia') AND plain_password IS NULL"))
         logger.info("Migracao verificada: cameras.rtsp_url.")
         return
 
@@ -58,6 +60,7 @@ def _run_lightweight_migrations() -> None:
         request_columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(replay_requests)").fetchall()}
         event_columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(replay_events)").fetchall()}
         client_columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(clients)").fetchall()}
+        user_columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(users)").fetchall()}
 
         if "status" not in camera_columns:
             connection.execute(
@@ -119,6 +122,11 @@ def _run_lightweight_migrations() -> None:
             if column_name not in client_columns:
                 connection.execute(text(f"ALTER TABLE clients ADD COLUMN {column_name} {column_type}"))
 
+        if "plain_password" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN plain_password VARCHAR(200)"))
+            logger.info("Migracao aplicada: users.plain_password.")
+        connection.execute(text("UPDATE users SET plain_password = 'admin123' WHERE id IN ('admin-mvp', 'admin-custodia') AND plain_password IS NULL"))
+
 
 def _seed_demo_tenants() -> None:
     from app.db.session import SessionLocal
@@ -154,6 +162,7 @@ def _seed_demo_tenants() -> None:
                 name="Admin MVP",
                 email="admin@mvp.test",
                 password_hash=hash_password("admin123"),
+                plain_password="admin123",
                 role="admin",
             ),
             User(
@@ -162,6 +171,7 @@ def _seed_demo_tenants() -> None:
                 name="Admin Custodia",
                 email="admin@custodia.test",
                 password_hash=hash_password("admin123"),
+                plain_password="admin123",
                 role="admin",
             ),
         ]

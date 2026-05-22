@@ -164,6 +164,7 @@ def _client_admin_response(db: Session, record: Client) -> dict[str, object]:
                 "id": user.id,
                 "name": user.name,
                 "email": user.email,
+                "plain_password": user.plain_password,
                 "role": user.role,
                 "created_at": user.created_at.isoformat(),
             }
@@ -526,6 +527,7 @@ def create_super_admin_client(payload: SuperAdminClientPayload, db: Session = De
             name=payload.admin_name.strip(),
             email=payload.admin_email.strip().lower(),
             password_hash=hash_password(payload.admin_password),
+            plain_password=payload.admin_password,
             role="admin",
         )
     )
@@ -565,6 +567,7 @@ def update_super_admin_client(
         admin.name = payload.admin_name.strip()
     if payload.admin_password and admin:
         admin.password_hash = hash_password(payload.admin_password)
+        admin.plain_password = payload.admin_password
 
     db.commit()
     db.refresh(client)
