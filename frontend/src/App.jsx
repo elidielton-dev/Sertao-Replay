@@ -1398,7 +1398,8 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
 }
 
 const STREAM_CHAT_STORAGE_KEY = "sertao_stream_chat_messages";
-const STREAM_CHAT_USER = "admin";
+const STREAM_CHAT_USER_KEY = "sertao_stream_chat_user";
+const STREAM_CHAT_USER = "Atleta";
 
 function chatInitials(name) {
   const parts = String(name || "Torcedor")
@@ -1423,6 +1424,14 @@ function loadStoredChatMessages() {
   }
 }
 
+function loadStoredChatUser() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return window.localStorage.getItem(STREAM_CHAT_USER_KEY) || "";
+}
+
 function normalizeChatMessage(item) {
   return {
     id: item.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -1433,7 +1442,7 @@ function normalizeChatMessage(item) {
   };
 }
 
-function StreamingChatPanel({ chatDraft, chatListRef, chatMessages, handleSendChat, setChatDraft, className = "" }) {
+function StreamingChatPanel({ chatDraft, chatListRef, chatMessages, handleSendChat, setChatDraft, userName, onChangeUser, className = "" }) {
   return (
     <section className={`flex min-h-[360px] min-w-0 flex-col sm:min-h-[420px] ${className}`} data-purpose="streaming-chat">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#8ddc00]/20 bg-[#101413]/75 backdrop-blur-xl">
@@ -1443,6 +1452,11 @@ function StreamingChatPanel({ chatDraft, chatListRef, chatMessages, handleSendCh
             Chat ao Vivo
           </h2>
           <span className="text-xs font-bold text-[#c0caad]">{chatMessages.length}</span>
+        </div>
+        <div className="border-b border-[#8ddc00]/10 bg-[#181c1b] px-4 py-3">
+          <button className="text-left text-xs font-bold uppercase tracking-[0.12em] text-[#a1fb00]" onClick={onChangeUser} type="button">
+            {userName || STREAM_CHAT_USER}
+          </button>
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-4" ref={chatListRef}>
           {!chatMessages.length ? (
@@ -1503,7 +1517,18 @@ function StreamingPage({ clientSlug = "" }) {
   const [webrtcConfigVersion, setWebrtcConfigVersion] = useState(0);
   const [chatMessages, setChatMessages] = useState(() => loadStoredChatMessages());
   const [chatDraft, setChatDraft] = useState("");
+  const [chatUserName, setChatUserName] = useState(() => loadStoredChatUser());
+  const [chatNameDraft, setChatNameDraft] = useState(() => loadStoredChatUser());
+  const [showChatNameModal, setShowChatNameModal] = useState(() => !loadStoredChatUser());
   const [previewReplayId, setPreviewReplayId] = useState("");
+
+  function saveChatUserName(name) {
+    const safeName = name.trim() || STREAM_CHAT_USER;
+    setChatUserName(safeName);
+    setChatNameDraft(safeName);
+    setShowChatNameModal(false);
+    window.localStorage.setItem(STREAM_CHAT_USER_KEY, safeName);
+  }
 
   useEffect(() => {
     async function loadStreamingData() {
@@ -1795,7 +1820,7 @@ function StreamingPage({ clientSlug = "" }) {
   async function handleSendChat(event) {
     event.preventDefault();
     const text = chatDraft.trim();
-    const user = STREAM_CHAT_USER;
+    const user = (chatUserName || STREAM_CHAT_USER).trim();
     if (!text) {
       return;
     }
@@ -1827,6 +1852,32 @@ function StreamingPage({ clientSlug = "" }) {
 
   return (
     <main className="min-h-screen bg-[#101413] px-3 pb-10 pt-20 text-[#e0e3e0] sm:px-4 md:px-8 xl:px-12">
+      {showChatNameModal ? (
+        <div className="fixed inset-0 z-[80] grid place-items-center bg-black/80 px-4 backdrop-blur-sm">
+          <form
+            className="w-full max-w-sm rounded-xl border border-[#8ddc00]/30 bg-[#101413] p-5 shadow-[0_0_30px_rgba(141,220,0,0.14)]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveChatUserName(chatNameDraft);
+            }}
+          >
+            <AppLogoIcon className="mb-4 h-12 w-12 rounded-xl ring-1 ring-neon-green/30" />
+            <h2 className="mb-2 text-xl font-black text-white">Seu nome no chat</h2>
+            <p className="mb-4 text-sm text-[#c0caad]">Digite o nome que vai aparecer quando voce comentar na live.</p>
+            <input
+              autoFocus
+              className="mb-4 w-full rounded-lg border border-[#8ddc00]/30 bg-black px-3 py-3 text-white outline-none focus:border-[#a1fb00]"
+              maxLength={80}
+              onChange={(event) => setChatNameDraft(event.target.value)}
+              placeholder="Ex: Joao Silva"
+              value={chatNameDraft}
+            />
+            <button className="w-full rounded-lg bg-[#a1fb00] px-4 py-3 text-sm font-black uppercase text-black" type="submit">
+              Entrar no streaming
+            </button>
+          </form>
+        </div>
+      ) : null}
       <nav className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between gap-3 border-b border-[#8ddc00]/30 bg-[#101413]/80 px-3 shadow-[0_0_15px_rgba(141,220,0,0.1)] backdrop-blur-xl sm:px-4 md:px-8 xl:px-12">
         <a className="flex min-w-0 items-center no-underline transition hover:opacity-90" href={clientPath(clientSlug, "/")} aria-label="Sertao Replay - inicio">
           <img alt="Sertao Replay" className="h-10 w-auto max-w-[min(13rem,55vw)] object-contain sm:h-11" src="/assets/logo-sertao-replay-nav.png" />
@@ -1877,6 +1928,8 @@ function StreamingPage({ clientSlug = "" }) {
             chatMessages={chatMessages}
             handleSendChat={handleSendChat}
             setChatDraft={setChatDraft}
+            userName={chatUserName}
+            onChangeUser={() => setShowChatNameModal(true)}
           className="lg:sticky lg:top-24 lg:col-span-4 lg:row-span-3 lg:h-[calc(100vh-120px)] xl:col-span-3"
         />
 
@@ -2739,6 +2792,8 @@ function SuperAdminPage() {
       return {};
     }
   });
+  const [cep, setCep] = useState("");
+  const [cepStatus, setCepStatus] = useState("");
   const [message, setMessage] = useState("Entre para carregar os clientes.");
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
@@ -2789,8 +2844,10 @@ function SuperAdminPage() {
     try {
       await navigator.clipboard.writeText(value);
       setMessage("Chave de instalacao copiada.");
+      window.alert("Chave de instalacao copiada.");
     } catch {
       setMessage(`Chave de instalacao: ${value}`);
+      window.alert(`Chave de instalacao: ${value}`);
     }
   }
 
@@ -2811,8 +2868,38 @@ function SuperAdminPage() {
     try {
       await navigator.clipboard.writeText(value);
       setMessage("Senha do cliente copiada.");
+      window.alert("Senha do cliente copiada.");
     } catch {
       setMessage(`Senha do cliente: ${value}`);
+      window.alert(`Senha do cliente: ${value}`);
+    }
+  }
+
+  async function lookupCep(value = cep) {
+    const cleanCep = String(value || "").replace(/\D/g, "");
+    setCep(cleanCep);
+    if (cleanCep.length !== 8) {
+      setCepStatus("Informe um CEP com 8 numeros.");
+      return;
+    }
+
+    setCepStatus("Buscando endereco pelo CEP...");
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+      if (!response.ok || data?.erro) {
+        throw new Error("CEP nao encontrado.");
+      }
+
+      const parts = [
+        data.logradouro,
+        data.bairro,
+        data.localidade && data.uf ? `${data.localidade}/${data.uf}` : data.localidade || data.uf,
+      ].filter(Boolean);
+      updateForm("address", parts.join(", "));
+      setCepStatus("Endereco preenchido pelo ViaCEP.");
+    } catch (error) {
+      setCepStatus(error.message || "Nao foi possivel buscar o CEP.");
     }
   }
 
@@ -2844,6 +2931,8 @@ function SuperAdminPage() {
       admin_password: "",
       is_active: true,
     });
+    setCep("");
+    setCepStatus("");
   }
 
   async function loadClients(nextSelectedId = selectedId) {
@@ -3162,8 +3251,26 @@ function SuperAdminPage() {
                 <label>Email da empresa<input value={form.company_email} onChange={(event) => updateForm("company_email", event.target.value)} type="email" /></label>
                 <label>Telefone<input value={form.company_phone} onChange={(event) => updateForm("company_phone", event.target.value)} /></label>
                 <label>CNPJ / documento<input value={form.document} onChange={(event) => updateForm("document", event.target.value)} /></label>
+                <label>
+                  CEP
+                  <input
+                    inputMode="numeric"
+                    maxLength={9}
+                    onBlur={() => lookupCep()}
+                    onChange={(event) => {
+                      const value = event.target.value.replace(/\D/g, "").slice(0, 8);
+                      setCep(value);
+                      if (value.length === 8) {
+                        lookupCep(value);
+                      }
+                    }}
+                    placeholder="00000000"
+                    value={cep}
+                  />
+                </label>
                 <label className="is-wide">Endereco<input value={form.address} onChange={(event) => updateForm("address", event.target.value)} /></label>
               </div>
+              {cepStatus ? <div className="super-admin-form-section"><span>{cepStatus}</span></div> : null}
               <div className="super-admin-form-section">
                 <strong>Login administrativo</strong>
                 <span>Usuario e senha que o cliente usara para acessar o admin.</span>
