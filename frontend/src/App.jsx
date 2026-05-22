@@ -2435,23 +2435,6 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
     }
   }
 
-  function exportAdminData() {
-    const payload = {
-      client,
-      dashboard,
-      cameras,
-      replays,
-      exported_at: new Date().toISOString(),
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${clientSlug || "sertao-replay"}-admin-export.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
   const navItems = [
     { href: `${adminBase}/dashboard`, label: "Inicio", icon: Home, key: "dashboard" },
   ];
@@ -2466,7 +2449,6 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
             </button>
             <a href={`${adminBase}/dashboard`} className="tenant-admin-logo-link" aria-label="Sertao Replay admin">
               <img alt="Sertao Replay" src="/assets/logo-sertao-replay-nav.png" />
-              <span>Sertao Replay</span>
             </a>
           </div>
 
@@ -2491,7 +2473,6 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
           </div>
           <div className="tenant-admin-heading-actions">
             <a className="tenant-admin-secondary" href={publicUrl || "/"} target="_blank" rel="noreferrer">Pagina publica</a>
-            <button className="tenant-admin-primary" onClick={exportAdminData} type="button">Exportar dados</button>
           </div>
         </div>
 
@@ -3014,6 +2995,10 @@ export default function App() {
     const clientFieldMatch = route.match(/^campo(\d+)$/i);
 
     if (!route) {
+      return <HomePage clientSlug={clientSlug} />;
+    }
+
+    if (lowerRoute === "dashboard") {
       return <HomePage clientSlug={clientSlug} />;
     }
 
