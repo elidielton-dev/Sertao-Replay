@@ -1,4 +1,5 @@
 import re
+import secrets
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -92,6 +93,10 @@ class SuperAdminLoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=200)
 
 
+class InstallResolveRequest(BaseModel):
+    install_key: str = Field(min_length=6, max_length=120)
+
+
 def require_operator(
     request: Request,
     x_operator_token: str | None = Header(default=None),
@@ -122,12 +127,29 @@ def _client_response(record: Client) -> dict[str, object]:
         "company_phone": record.company_phone,
         "document": record.document,
         "address": record.address,
+        "install_key": record.install_key,
         "is_active": record.is_active,
         "created_at": record.created_at.isoformat(),
     }
 
 
+def _generate_install_key() -> str:
+    return f"SR-{secrets.token_urlsafe(18).replace('_', '').replace('-', '').upper()[:20]}"
+
+
+def _ensure_client_install_key(db: Session, record: Client) -> str:
+    if record.install_key:
+        return record.install_key
+
+    while True:
+        candidate = _generate_install_key()
+        if not db.query(Client).filter(Client.install_key == candidate).first():
+            record.install_key = candidate
+            return candidate
+
+
 def _client_admin_response(db: Session, record: Client) -> dict[str, object]:
+    _ensure_client_install_key(db, record)
     cameras_total = db.query(CameraConfig).filter(CameraConfig.client_id == record.id).count()
     replays_total = db.query(Replay).filter(Replay.client_id == record.id).count()
     users = db.query(User).filter(User.client_id == record.id).order_by(User.created_at.desc()).all()
@@ -409,10 +431,41 @@ def login_super_admin(payload: SuperAdminLoginRequest):
     raise HTTPException(status_code=401, detail="Login do super admin invalido.")
 
 
+@router.post("/install/resolve")
+def resolve_install_key(payload: InstallResolveRequest, db: Session = Depends(get_db)):
+    install_key = payload.install_key.strip().upper()
+    client = db.query(Client).filter(Client.install_key == install_key, Client.is_active.is_(True)).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Chave de instalacao invalida ou cliente inativo.")
+
+    admin = db.query(User).filter(User.client_id == client.id).order_by(User.created_at.asc()).first()
+    return {
+        "ok": True,
+        "client": {
+            "id": client.id,
+            "name": client.name,
+            "slug": client.slug,
+            "plan": client.plan,
+            "admin_email": admin.email if admin else None,
+            "public_url": f"https://sports-replay-mvp.vercel.app/{client.slug}",
+            "admin_url": f"https://sports-replay-mvp.vercel.app/admin/{client.slug}/dashboard",
+        },
+        "capture": {
+            "operator_token": settings.operator_token,
+            "client_id": client.id,
+            "client_slug": client.slug,
+            "camera_id": "campo-01",
+            "operator_url": f"https://sports-replay-mvp.vercel.app/{client.slug}",
+        },
+    }
+
+
 @router.get("/super-admin/clients")
 def list_super_admin_clients(db: Session = Depends(get_db), _: None = Depends(require_operator)):
     records = db.query(Client).order_by(Client.created_at.desc()).all()
-    return [_client_admin_response(db, record) for record in records]
+    response = [_client_admin_response(db, record) for record in records]
+    db.commit()
+    return response
 
 
 @router.get("/super-admin/clients/{client_id}")
@@ -420,7 +473,9 @@ def get_super_admin_client(client_id: str, db: Session = Depends(get_db), _: Non
     record = db.get(Client, client_id)
     if not record:
         raise HTTPException(status_code=404, detail="Cliente nao encontrado.")
-    return _client_admin_response(db, record)
+    response = _client_admin_response(db, record)
+    db.commit()
+    return response
 
 
 @router.post("/super-admin/clients")
@@ -441,6 +496,7 @@ def create_super_admin_client(payload: SuperAdminClientPayload, db: Session = De
         company_phone=(payload.company_phone or "").strip() or None,
         document=(payload.document or "").strip() or None,
         address=(payload.address or "").strip() or None,
+        install_key=_generate_install_key(),
         is_active=payload.is_active,
     )
     db.add(client)

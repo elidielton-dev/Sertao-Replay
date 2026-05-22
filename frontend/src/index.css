@@ -1245,7 +1245,8 @@ h1 {
   gap: 8px;
 }
 
-.super-admin-credential-card {
+.super-admin-credential-card,
+.super-admin-install-card {
   display: grid;
   gap: 10px;
   border: 1px solid rgba(161, 251, 0, 0.26);
@@ -1256,7 +1257,10 @@ h1 {
 
 .super-admin-credential-card > span,
 .super-admin-credential-card b,
-.super-admin-credential-card small {
+.super-admin-credential-card small,
+.super-admin-install-card > span,
+.super-admin-install-card small,
+.super-admin-install-card button {
   color: #c0caad;
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 12px;
@@ -1284,7 +1288,33 @@ h1 {
   overflow-wrap: anywhere;
 }
 
-.super-admin-credential-card small {
+.super-admin-install-card strong {
+  border-radius: 8px;
+  padding: 12px;
+  color: #102000;
+  background: #a1fb00;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.super-admin-install-card button {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(161, 251, 0, 0.35);
+  border-radius: 999px;
+  padding: 0 14px;
+  color: #a1fb00;
+  background: rgba(8, 12, 11, 0.72);
+  cursor: pointer;
+}
+
+.super-admin-credential-card small,
+.super-admin-install-card small {
   line-height: 1.5;
   text-transform: none;
 }

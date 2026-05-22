@@ -40,6 +40,7 @@ def _run_lightweight_migrations() -> None:
             connection.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS company_phone VARCHAR(40)"))
             connection.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS document VARCHAR(80)"))
             connection.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS address VARCHAR(500)"))
+            connection.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS install_key VARCHAR(80) UNIQUE"))
         logger.info("Migracao verificada: cameras.rtsp_url.")
         return
 
@@ -113,6 +114,7 @@ def _run_lightweight_migrations() -> None:
             ("company_phone", "VARCHAR(40)"),
             ("document", "VARCHAR(80)"),
             ("address", "VARCHAR(500)"),
+            ("install_key", "VARCHAR(80)"),
         ):
             if column_name not in client_columns:
                 connection.execute(text(f"ALTER TABLE clients ADD COLUMN {column_name} {column_type}"))

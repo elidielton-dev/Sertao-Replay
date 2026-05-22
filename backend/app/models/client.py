@@ -18,5 +18,6 @@ class Client(Base):
     company_phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     document: Mapped[str | None] = mapped_column(String(80), nullable=True)
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    install_key: Mapped[str | None] = mapped_column(String(80), unique=True, index=True, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -41,6 +41,8 @@ class CaptureServer:
         load_dotenv()
         self.backend_api_url = env("BACKEND_API_URL").rstrip("/")
         self.operator_token = env("OPERATOR_TOKEN")
+        self.client_id = env("CLIENT_ID", required=False)
+        self.client_slug = env("CLIENT_SLUG", required=False)
         self.camera_id = env("CAMERA_ID")
         self.local_rtsp_url = env("LOCAL_RTSP_URL", required=False)
         self.rtsp_transport = os.getenv("RTSP_TRANSPORT", "tcp").strip().lower() or "tcp"
@@ -67,6 +69,10 @@ class CaptureServer:
         self.last_snapshot_upload_at = 0.0
         self.session = requests.Session()
         self.session.headers.update({"X-Operator-Token": self.operator_token})
+        if self.client_id:
+            self.session.headers.update({"X-Client-Id": self.client_id})
+        if self.client_slug:
+            self.session.headers.update({"X-Client-Slug": self.client_slug})
 
         if not self.ffmpeg:
             raise RuntimeError("FFmpeg nao encontrado no PATH.")
@@ -77,7 +83,7 @@ class CaptureServer:
         self.ffmpeg_log_path.parent.mkdir(parents=True, exist_ok=True)
 
     def run(self) -> None:
-        logging.info("Capture-server iniciado para camera_id=%s", self.camera_id)
+        logging.info("Capture-server iniciado para client_id=%s camera_id=%s", self.client_id or "default", self.camera_id)
         self.register_camera()
         self.load_remote_camera_config()
         logging.info("RTSP local configurado: %s", redact(self.local_rtsp_url))

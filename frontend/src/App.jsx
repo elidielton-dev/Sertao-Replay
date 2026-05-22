@@ -2729,6 +2729,20 @@ function SuperAdminPage() {
     setLoginForm((current) => ({ ...current, [field]: value }));
   }
 
+  async function copyInstallKey(value) {
+    if (!value) {
+      setMessage("Chave de instalacao indisponivel.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value);
+      setMessage("Chave de instalacao copiada.");
+    } catch {
+      setMessage(`Chave de instalacao: ${value}`);
+    }
+  }
+
   function saveSuperSession(session, nextToken) {
     if (session && nextToken) {
       localStorage.setItem(SUPER_ADMIN_SESSION_KEY, JSON.stringify(session));
@@ -3082,6 +3096,14 @@ function SuperAdminPage() {
                     <p><b>Usuario</b><strong>{selectedAdmin?.email || "Usuario nao cadastrado"}</strong></p>
                     <p><b>Senha</b><strong>{selectedPassword || "Senha nao exibida"}</strong></p>
                     {!selectedPassword ? <small>Por seguranca, senhas antigas nao ficam visiveis. Ao criar um novo cliente, a senha aparece aqui nesta sessao.</small> : null}
+                  </div>
+                  <div className="super-admin-install-card">
+                    <span>Chave do instalador</span>
+                    <strong>{selectedClient.install_key || "Gerando chave..."}</strong>
+                    <small>Use esta chave no instalador da maquina do cliente para vincular o servidor local a esta empresa.</small>
+                    <button type="button" onClick={() => copyInstallKey(selectedClient.install_key)}>
+                      <KeyRound size={17} /> Copiar chave
+                    </button>
                   </div>
                   <div className="super-admin-info-list">
                     <p><span>Empresa</span><b>{selectedClient.company_email || "Email nao informado"}</b></p>
