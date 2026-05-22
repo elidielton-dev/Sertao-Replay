@@ -45,7 +45,8 @@ class CaptureServer:
         self.client_slug = env("CLIENT_SLUG", required=False)
         self.camera_id = env("CAMERA_ID")
         self.local_rtsp_url = env("LOCAL_RTSP_URL", required=False)
-        self.rtsp_transport = os.getenv("RTSP_TRANSPORT", "tcp").strip().lower() or "tcp"
+        self.rtsp_transport = os.getenv("RTSP_TRANSPORT", "auto").strip().lower() or "auto"
+        self.rtsp_transport_index = 0
         self.buffer_video_codec = os.getenv("BUFFER_VIDEO_CODEC", "libx264").strip() or "libx264"
         self.buffer_fps = int(os.getenv("BUFFER_FPS", "30"))
         self.replay_video_codec = os.getenv("REPLAY_VIDEO_CODEC", "libx264").strip() or "libx264"
@@ -132,6 +133,7 @@ class CaptureServer:
                     logging.warning("Segmento em uso ao limpar buffer, mantendo arquivo: %s", segment.name)
 
         pattern = str(self.buffer_dir / "segment_%03d.ts")
+        rtsp_transport = self.current_rtsp_transport()
         command = [
             self.ffmpeg,
             "-hide_banner",
@@ -139,7 +141,7 @@ class CaptureServer:
             "-loglevel",
             "warning",
             "-rtsp_transport",
-            self.rtsp_transport,
+            rtsp_transport,
             "-fflags",
             "+genpts+discardcorrupt",
             "-err_detect",
@@ -199,8 +201,8 @@ class CaptureServer:
 
         self.process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=self.ffmpeg_stderr)
         self.update_camera_status("connecting", "Conectando na camera local.")
-        self.send_log("info", "FFmpeg iniciado para manter buffer local.")
-        logging.info("FFmpeg iniciado para manter buffer local.")
+        self.send_log("info", f"FFmpeg iniciado para manter buffer local via {rtsp_transport}.")
+        logging.info("FFmpeg iniciado para manter buffer local via %s.", rtsp_transport)
 
     def ensure_buffer_running(self) -> None:
         if self.process and self.process.poll() is None:
@@ -218,8 +220,20 @@ class CaptureServer:
         logging.warning("FFmpeg caiu. exit_code=%s. Tentando reconectar.", exit_code)
         self.send_log("warning", f"FFmpeg caiu com codigo {exit_code}. Tentando reconectar.")
         self.update_camera_status("connecting", "Reconectando camera local.")
+        self.rotate_rtsp_transport()
         time.sleep(2)
         self.start_buffer(clear_buffer=False)
+
+    def current_rtsp_transport(self) -> str:
+        if self.rtsp_transport == "auto":
+            return ("tcp", "udp")[self.rtsp_transport_index % 2]
+        if self.rtsp_transport in {"tcp", "udp"}:
+            return self.rtsp_transport
+        return "tcp"
+
+    def rotate_rtsp_transport(self) -> None:
+        if self.rtsp_transport == "auto":
+            self.rtsp_transport_index += 1
 
     def poll_pending_requests(self) -> None:
         try:

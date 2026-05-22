@@ -109,7 +109,7 @@ if ($confirm.Trim().ToUpperInvariant() -ne "S") {
 
 $cameraId = $selectedCamera.id
 $cameraName = $selectedCamera.name
-$rtspTransport = "tcp"
+$rtspTransport = "auto"
 $replaySeconds = "15"
 
 $envLines = @(
