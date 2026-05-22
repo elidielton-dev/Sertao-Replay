@@ -73,12 +73,44 @@ if ([string]::IsNullOrWhiteSpace($capture.operator_token)) {
   Write-Host "AVISO: a API nao retornou OPERATOR_TOKEN. Configure OPERATOR_TOKEN manualmente no capture-server\.env." -ForegroundColor Yellow
 }
 
-$cameraId = Read-Value "ID da camera" $capture.camera_id
-$cameraName = Read-Value "Nome da camera" "Campo 01"
-$rtspUrl = Read-Host "URL RTSP da camera (ex: rtsp://usuario:senha@192.168.0.10:554/onvif1). Pode deixar vazio se ja cadastrou no admin"
-$rtspUrl = $rtspUrl.Trim()
-$rtspTransport = Read-Value "Transporte RTSP" "tcp"
-$replaySeconds = Read-Value "Tempo padrao do replay em segundos" "15"
+$cameras = @($resolved.cameras)
+if ($cameras.Count -eq 0) {
+  throw "Nenhuma camera ativa cadastrada para esta empresa. Cadastre a camera no painel admin do cliente antes de rodar o instalador."
+}
+
+Write-Host "Cameras cadastradas no admin:"
+for ($i = 0; $i -lt $cameras.Count; $i++) {
+  $camera = $cameras[$i]
+  $rtspStatus = if ($camera.has_rtsp) { "RTSP OK" } else { "sem RTSP" }
+  Write-Host "  [$($i + 1)] $($camera.name) | ID: $($camera.id) | $rtspStatus"
+}
+
+if ($cameras.Count -eq 1) {
+  $selectedCamera = $cameras[0]
+  Write-Host ""
+  Write-Host "Camera selecionada automaticamente: $($selectedCamera.name)"
+} else {
+  do {
+    $cameraChoice = Read-Host "Numero da camera que esta maquina vai operar"
+    $cameraIndex = 0
+    $validChoice = [int]::TryParse($cameraChoice, [ref]$cameraIndex) -and $cameraIndex -ge 1 -and $cameraIndex -le $cameras.Count
+  } while (!$validChoice)
+  $selectedCamera = $cameras[$cameraIndex - 1]
+}
+
+if (!$selectedCamera.has_rtsp) {
+  throw "A camera '$($selectedCamera.name)' ainda nao tem RTSP cadastrado no admin. Cadastre/valide a camera no painel admin antes de instalar."
+}
+
+$confirm = Read-Host "Confirmar instalacao para a camera '$($selectedCamera.name)'? (S/N)"
+if ($confirm.Trim().ToUpperInvariant() -ne "S") {
+  throw "Instalacao cancelada pelo operador."
+}
+
+$cameraId = $selectedCamera.id
+$cameraName = $selectedCamera.name
+$rtspTransport = "tcp"
+$replaySeconds = "15"
 
 $envLines = @(
   "BACKEND_API_URL=$apiUrl",
@@ -87,7 +119,7 @@ $envLines = @(
   "CLIENT_SLUG=$($capture.client_slug)",
   "CAMERA_ID=$cameraId",
   "CAMERA_NAME=$cameraName",
-  "LOCAL_RTSP_URL=$rtspUrl",
+  "LOCAL_RTSP_URL=",
   "OPERATOR_URL=$($capture.operator_url)",
   "RTSP_TRANSPORT=$rtspTransport",
   "BUFFER_VIDEO_CODEC=libx264",

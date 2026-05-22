@@ -445,6 +445,8 @@ def resolve_install_key(payload: InstallResolveRequest, db: Session = Depends(ge
         raise HTTPException(status_code=404, detail="Chave de instalacao invalida ou cliente inativo.")
 
     admin = db.query(User).filter(User.client_id == client.id).order_by(User.created_at.asc()).first()
+    cameras = db.query(CameraConfig).filter(CameraConfig.client_id == client.id, CameraConfig.enabled.is_(True)).order_by(CameraConfig.name.asc()).all()
+    first_camera = cameras[0] if cameras else None
     return {
         "ok": True,
         "client": {
@@ -456,11 +458,22 @@ def resolve_install_key(payload: InstallResolveRequest, db: Session = Depends(ge
             "public_url": f"https://sports-replay-mvp.vercel.app/{client.slug}",
             "admin_url": f"https://sports-replay-mvp.vercel.app/admin/{client.slug}/dashboard",
         },
+        "cameras": [
+            {
+                "id": camera.id,
+                "name": camera.name,
+                "slug": camera.slug or camera.id,
+                "status": camera.status,
+                "has_rtsp": bool(camera.rtsp_url),
+            }
+            for camera in cameras
+        ],
         "capture": {
             "operator_token": settings.operator_token,
             "client_id": client.id,
             "client_slug": client.slug,
-            "camera_id": f"{client.slug}-campo-01"[:64],
+            "camera_id": first_camera.id if first_camera else f"{client.slug}-campo-01"[:64],
+            "camera_name": first_camera.name if first_camera else "Campo 01",
             "operator_url": f"https://sports-replay-mvp.vercel.app/{client.slug}",
         },
     }
