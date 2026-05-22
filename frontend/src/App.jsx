@@ -2561,7 +2561,7 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
     setCameraForm({
       id: camera.id || "",
       name: camera.name || "",
-      camera_ip: camera.rtsp_url?.match(/rtsp:\/\/(?:[^@]+@)?([^/:]+)/i)?.[1] || "",
+      camera_ip: camera.rtsp_url || "",
     });
   }
 
@@ -2772,7 +2772,7 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
               <div className="tenant-admin-section-head">
                 <div>
                   <h2>Adicionar camera</h2>
-                  <p>Informe ID, nome e IP. A API descobre e valida o caminho RTSP.</p>
+                  <p>Informe ID, nome e IP/porta ou URL RTSP completa.</p>
                 </div>
               </div>
               <form className="tenant-admin-form" onSubmit={saveTenantCamera}>
@@ -2794,13 +2794,12 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
                   required
                 />
 
-                <label htmlFor="tenantCameraIp">IP da camera</label>
+                <label htmlFor="tenantCameraIp">IP ou RTSP da camera</label>
                 <input
                   id="tenantCameraIp"
                   value={cameraForm.camera_ip}
                   onChange={(event) => updateCameraForm("camera_ip", event.target.value)}
-                  placeholder="192.168.0.6"
-                  inputMode="decimal"
+                  placeholder="10.0.0.142:8554 ou rtsp://10.0.0.142:8554/ronaldinho-demo"
                   required
                 />
 

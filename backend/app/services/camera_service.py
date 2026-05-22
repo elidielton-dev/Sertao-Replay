@@ -80,11 +80,6 @@ class CameraService:
         return self._to_schema(record)
 
     def save_admin_camera_from_ip(self, db: Session, payload: AdminCameraCreate, client_id: str) -> Camera:
-        host, _ = self._parse_camera_host(payload.camera_ip)
-        duplicate = self._camera_with_rtsp_host(db, client_id, host, exclude_camera_id=payload.id)
-        if duplicate:
-            raise ValueError(f"O IP {host} ja esta cadastrado na camera {duplicate.id}.")
-
         rtsp_url = self.discover_rtsp_url(payload.camera_ip)
 
         camera = CameraCreate(
@@ -93,7 +88,7 @@ class CameraService:
             slug=payload.id,
             rtsp_url=rtsp_url,
             enabled=True,
-            notes=f"Camera cadastrada automaticamente pelo IP {payload.camera_ip}.",
+            notes=f"Camera cadastrada automaticamente por {payload.camera_ip}.",
         )
         return self.save_camera(db, camera, client_id=client_id)
 
@@ -119,6 +114,10 @@ class CameraService:
         return None
 
     def discover_rtsp_url(self, camera_ip: str) -> str:
+        cleaned = camera_ip.strip()
+        if cleaned.lower().startswith("rtsp://"):
+            return cleaned
+
         host, port = self._parse_camera_host(camera_ip)
         candidates = self._rtsp_candidates(host, port)
         errors: list[str] = []
@@ -162,6 +161,7 @@ class CameraService:
         base = f"rtsp://{host}:{port}"
         paths = [
             "/",
+            "/ronaldinho-demo",
             "/onvif1",
             "/onvif2",
             "/live",

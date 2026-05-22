@@ -1,5 +1,6 @@
 from datetime import datetime
 import ipaddress
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -54,7 +55,7 @@ class CameraCreate(BaseModel):
 class AdminCameraCreate(BaseModel):
     id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
     name: str = Field(min_length=1, max_length=120)
-    camera_ip: str = Field(min_length=3, max_length=80)
+    camera_ip: str = Field(min_length=3, max_length=500)
 
     @field_validator("id", "name")
     @classmethod
@@ -65,6 +66,15 @@ class AdminCameraCreate(BaseModel):
     @classmethod
     def validate_camera_ip(cls, value: str) -> str:
         cleaned = value.strip()
+        if cleaned.lower().startswith("rtsp://"):
+            parsed = urlsplit(cleaned)
+            if not parsed.hostname:
+                raise ValueError("Informe uma URL RTSP valida.")
+            port = parsed.port or 554
+            if port < 1 or port > 65535:
+                raise ValueError("Informe uma porta valida para a camera.")
+            return cleaned
+
         host = cleaned.split(":", 1)[0]
         raw_port = cleaned.split(":", 1)[1] if ":" in cleaned else "554"
         try:
