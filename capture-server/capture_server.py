@@ -51,6 +51,9 @@ class CaptureServer:
         self.rtsp_transport_index = 0
         self.buffer_video_codec = os.getenv("BUFFER_VIDEO_CODEC", "libx264").strip() or "libx264"
         self.buffer_fps = int(os.getenv("BUFFER_FPS", "30"))
+        self.buffer_video_bitrate = os.getenv("BUFFER_VIDEO_BITRATE", "2500k").strip() or "2500k"
+        self.buffer_video_maxrate = os.getenv("BUFFER_VIDEO_MAXRATE", self.buffer_video_bitrate).strip() or self.buffer_video_bitrate
+        self.buffer_video_bufsize = os.getenv("BUFFER_VIDEO_BUFSIZE", "5000k").strip() or "5000k"
         self.buffer_audio_codec = os.getenv("BUFFER_AUDIO_CODEC", "aac").strip() or "aac"
         self.replay_video_codec = os.getenv("REPLAY_VIDEO_CODEC", "libx264").strip() or "libx264"
         self.replay_audio_codec = os.getenv("REPLAY_AUDIO_CODEC", "aac").strip() or "aac"
@@ -279,6 +282,12 @@ class CaptureServer:
                     "0",
                     "-pix_fmt",
                     "yuv420p",
+                    "-b:v",
+                    self.buffer_video_bitrate,
+                    "-maxrate",
+                    self.buffer_video_maxrate,
+                    "-bufsize",
+                    self.buffer_video_bufsize,
                 ]
             )
 
