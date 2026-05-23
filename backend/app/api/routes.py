@@ -304,9 +304,37 @@ def _parse_url_map(raw_map: str | None, default_map: str) -> dict[str, str]:
     return url_map
 
 
+def _camera_id_aliases(camera_id: str) -> list[str]:
+    camera = (camera_id or "").strip()
+    if not camera:
+        return []
+
+    aliases: list[str] = [camera]
+    match = re.match(r"^campo-(\d+)(?:-(?:camera|cam)-(\d+))?$", camera, re.IGNORECASE)
+    if match:
+        field_num = int(match.group(1))
+        cam_num = int(match.group(2) or 1)
+        aliases.extend(
+            [
+                f"campo-{field_num:02d}",
+                f"campo-{field_num}",
+                f"camera{cam_num}",
+                f"camera-{cam_num:02d}",
+                f"camera-{cam_num}",
+            ]
+        )
+
+    # preserve order and remove duplicates
+    return list(dict.fromkeys(aliases))
+
+
 def _hls_url_for_camera(camera_id: str, asset_path: str = "index.m3u8") -> str | None:
     url_map = _parse_url_map(settings.hls_url_map, DEFAULT_HLS_URL_MAP)
-    base_url = url_map.get(camera_id)
+    base_url = None
+    for alias in _camera_id_aliases(camera_id):
+        if alias in url_map:
+            base_url = url_map[alias]
+            break
     if not base_url:
         return None
 
@@ -317,8 +345,9 @@ def _hls_url_for_camera(camera_id: str, asset_path: str = "index.m3u8") -> str |
 
 def _webrtc_offer_url(camera_id: str) -> str | None:
     url_map = _webrtc_url_map()
-    if camera_id in url_map:
-        return url_map[camera_id]
+    for alias in _camera_id_aliases(camera_id):
+        if alias in url_map:
+            return url_map[alias]
 
     if settings.webrtc_whep_base_url:
         safe_camera_id = urllib.parse.quote(camera_id, safe="")
