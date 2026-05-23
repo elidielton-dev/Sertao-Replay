@@ -1725,9 +1725,11 @@ function StreamingPage({ clientSlug = "" }) {
   const [chatNameDraft, setChatNameDraft] = useState(() => loadStoredChatUser(clientSlug) || STREAM_CHAT_USER);
   const [showChatNameModal, setShowChatNameModal] = useState(false);
   const [previewReplayId, setPreviewReplayId] = useState("");
+  const selectedCamera = cameras.find((camera) => camera.id === selectedCameraId) || cameras[0];
 
   const requestReplayFromStreaming = useCallback(async (seconds = 15) => {
-    if (!selectedCamera?.id) {
+    const selectedCameraNow = cameras.find((camera) => camera.id === selectedCameraId) || cameras[0];
+    if (!selectedCameraNow?.id) {
       setMessage("Selecione uma camera para solicitar replay.");
       return;
     }
@@ -1737,7 +1739,7 @@ function StreamingPage({ clientSlug = "" }) {
       const data = await apiRequest(path, {
         method: "POST",
         body: JSON.stringify({
-          camera_id: selectedCamera.id,
+          camera_id: selectedCameraNow.id,
           seconds,
           label: `Replay ${seconds}s - Atleta`,
         }),
@@ -1746,7 +1748,7 @@ function StreamingPage({ clientSlug = "" }) {
     } catch (error) {
       setMessage(error.message || "Nao foi possivel solicitar replay.");
     }
-  }, [clientSlug, selectedCamera?.id]);
+  }, [clientSlug, selectedCameraId, cameras]);
 
   function saveChatUserName(name) {
     const safeName = name.trim() || STREAM_CHAT_USER;
@@ -1814,7 +1816,6 @@ function StreamingPage({ clientSlug = "" }) {
     return () => window.removeEventListener("storage", syncChat);
   }, []);
 
-  const selectedCamera = cameras.find((camera) => camera.id === selectedCameraId) || cameras[0];
   const selectedCameraIdentity = selectedCamera ? parseCameraIdentity(selectedCamera) : null;
   const posterImage = cameraTemplate(selectedCameraIdentity?.cameraId || 1).image;
   const effectiveWebrtcUrl = selectedCamera ? webrtcUrlForCamera(selectedCamera) : "";
