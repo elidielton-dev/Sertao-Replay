@@ -4195,9 +4195,15 @@ class AppErrorBoundary extends Component {
 function StreamingPageLite({ clientSlug = "" }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
+  const chatListRef = useRef(null);
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("Carregando live...");
   const [selectedCamera, setSelectedCamera] = useState(null);
+  const [chatMessages, setChatMessages] = useState(() => loadStoredChatMessages());
+  const [chatDraft, setChatDraft] = useState("");
+  const [chatUserName, setChatUserName] = useState(() => loadStoredChatUser(clientSlug) || STREAM_CHAT_USER);
+  const [chatNameDraft, setChatNameDraft] = useState(() => loadStoredChatUser(clientSlug) || STREAM_CHAT_USER);
+  const [showChatNameModal, setShowChatNameModal] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -4228,6 +4234,75 @@ function StreamingPageLite({ clientSlug = "" }) {
     };
   }, [clientSlug]);
 
+  function saveChatUserName(name) {
+    const safeName = name.trim() || STREAM_CHAT_USER;
+    setChatUserName(safeName);
+    setChatNameDraft(safeName);
+    setShowChatNameModal(false);
+    window.localStorage.setItem(streamChatUserKey(clientSlug), safeName);
+  }
+
+  useEffect(() => {
+    const storedUser = loadStoredChatUser(clientSlug) || STREAM_CHAT_USER;
+    setChatUserName(storedUser);
+    setChatNameDraft(storedUser);
+    setShowChatNameModal(false);
+  }, [clientSlug]);
+
+  useEffect(() => {
+    const chatList = chatListRef.current;
+    if (chatList) {
+      chatList.scrollTop = chatList.scrollHeight;
+    }
+  }, [chatMessages.length]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STREAM_CHAT_STORAGE_KEY, JSON.stringify(chatMessages.slice(-80)));
+    } catch {
+      // localStorage can be unavailable.
+    }
+  }, [chatMessages]);
+
+  useEffect(() => {
+    function syncChat(event) {
+      if (event.key === STREAM_CHAT_STORAGE_KEY) {
+        setChatMessages(loadStoredChatMessages());
+      }
+    }
+    window.addEventListener("storage", syncChat);
+    return () => window.removeEventListener("storage", syncChat);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCamera?.id) {
+      setChatMessages(loadStoredChatMessages());
+      return undefined;
+    }
+
+    let cancelled = false;
+    async function loadChatMessages() {
+      try {
+        const clientQuery = clientSlug ? `&client_slug=${encodeURIComponent(clientSlug)}` : "";
+        const data = await apiRequest(`/chat/messages?camera_id=${encodeURIComponent(selectedCamera.id)}&limit=80${clientQuery}`);
+        if (!cancelled && Array.isArray(data)) {
+          setChatMessages(data.map(normalizeChatMessage));
+        }
+      } catch {
+        if (!cancelled) {
+          setChatMessages(loadStoredChatMessages());
+        }
+      }
+    }
+
+    loadChatMessages();
+    const timer = window.setInterval(loadChatMessages, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [clientSlug, selectedCamera?.id]);
+
   useEffect(() => {
     const video = videoRef.current;
     hlsRef.current?.destroy();
@@ -4256,9 +4331,11 @@ function StreamingPageLite({ clientSlug = "" }) {
     }
 
     const hls = new Hls({
-      lowLatencyMode: false,
-      backBufferLength: 90,
-      maxBufferLength: 20,
+      lowLatencyMode: true,
+      backBufferLength: 45,
+      maxBufferLength: 12,
+      liveSyncDurationCount: 2,
+      maxLiveSyncPlaybackRate: 1.2,
       enableWorker: true,
     });
     hlsRef.current = hls;
@@ -4299,10 +4376,82 @@ function StreamingPageLite({ clientSlug = "" }) {
 
       <section className="mx-auto w-full max-w-6xl">
         <div className="mb-3 text-sm text-[#c0caad]">{message}</div>
-        <div className="overflow-hidden rounded-xl border border-[#8ddc00]/25 bg-black">
-          <video ref={videoRef} autoPlay controls muted playsInline className="aspect-video w-full bg-black object-contain" />
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="overflow-hidden rounded-xl border border-[#8ddc00]/25 bg-black">
+            <div className="mx-auto w-full max-w-[430px]" style={{ aspectRatio: "9 / 16" }}>
+              <video ref={videoRef} autoPlay controls muted playsInline className="h-full w-full bg-black object-cover object-center" />
+            </div>
+          </div>
+
+          <StreamingChatPanel
+            chatDraft={chatDraft}
+            chatListRef={chatListRef}
+            chatMessages={chatMessages}
+            handleSendChat={async (event) => {
+              event.preventDefault();
+              const text = chatDraft.trim();
+              const user = (chatUserName || STREAM_CHAT_USER).trim();
+              if (!text) {
+                return;
+              }
+
+              const fallbackMessage = {
+                id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                user,
+                initials: chatInitials(user),
+                text,
+                createdAt: new Date().toISOString(),
+              };
+
+              setChatDraft("");
+              try {
+                const saved = await apiRequest("/chat/messages", {
+                  method: "POST",
+                  body: JSON.stringify({
+                    client_slug: clientSlug || null,
+                    camera_id: selectedCamera?.id || null,
+                    user,
+                    text,
+                  }),
+                });
+                setChatMessages((current) => [...current.slice(-79), normalizeChatMessage(saved)]);
+              } catch {
+                setChatMessages((current) => [...current.slice(-79), fallbackMessage]);
+              }
+            }}
+            setChatDraft={setChatDraft}
+            userName={chatUserName}
+            onChangeUser={() => setShowChatNameModal(true)}
+          />
         </div>
       </section>
+
+      {showChatNameModal ? (
+        <div className="fixed inset-0 z-[80] grid place-items-center bg-black/80 px-4 backdrop-blur-sm">
+          <form
+            className="w-full max-w-sm rounded-xl border border-[#8ddc00]/30 bg-[#101413] p-5 shadow-[0_0_30px_rgba(141,220,0,0.14)]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveChatUserName(chatNameDraft);
+            }}
+          >
+            <AppLogoIcon className="mb-4 h-12 w-12 rounded-xl ring-1 ring-neon-green/30" />
+            <h2 className="mb-2 text-xl font-black text-white">Seu nome no chat</h2>
+            <p className="mb-4 text-sm text-[#c0caad]">Digite o nome que vai aparecer quando voce comentar na live.</p>
+            <input
+              autoFocus
+              className="mb-4 w-full rounded-lg border border-[#8ddc00]/30 bg-black px-3 py-3 text-white outline-none focus:border-[#a1fb00]"
+              maxLength={80}
+              onChange={(event) => setChatNameDraft(event.target.value)}
+              placeholder="Ex: Joao Silva"
+              value={chatNameDraft}
+            />
+            <button className="w-full rounded-lg bg-[#a1fb00] px-4 py-3 text-sm font-black uppercase text-black" type="submit">
+              Salvar nome
+            </button>
+          </form>
+        </div>
+      ) : null}
     </main>
   );
 }
