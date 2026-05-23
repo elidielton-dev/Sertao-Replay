@@ -4322,74 +4322,35 @@ function StreamingPageLite({ clientSlug = "" }) {
       return undefined;
     }
 
-    const hlsUrl = hlsUrlForCamera(selectedCamera);
     const webrtcUrl = webrtcUrlForCamera(selectedCamera);
-    if (!hlsUrl) {
+    if (!webrtcUrl) {
       setStatus("error");
-      setMessage("URL de live indisponivel.");
+      setMessage("URL WebRTC indisponivel.");
       return undefined;
     }
 
     let cancelled = false;
 
-    function connectHls() {
-      if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = hlsUrl;
-        const seekToStableDelay = () => {
-          if (Number.isFinite(video.duration) && video.duration > 14) {
-            video.currentTime = Math.max(0, video.duration - 12);
-          }
-        };
-        video.addEventListener("loadedmetadata", seekToStableDelay, { once: true });
-        video.play().catch(() => {});
-        setMessage("Live via HLS.");
-        return;
-      }
-
-      if (!Hls.isSupported()) {
+    async function connectWebrtcOnly() {
+      if (typeof window === "undefined" || !window.RTCPeerConnection) {
         setStatus("error");
-        setMessage("Navegador sem suporte a HLS.");
+        setMessage("Navegador sem suporte a WebRTC.");
         return;
       }
-
-      const hls = new Hls({
-        lowLatencyMode: false,
-        backBufferLength: 90,
-        maxBufferLength: 30,
-        liveSyncDuration: 12,
-        liveMaxLatencyDuration: 20,
-        maxLiveSyncPlaybackRate: 1.05,
-        enableWorker: true,
-      });
-      hlsRef.current = hls;
-      hls.loadSource(hlsUrl);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        if (cancelled) return;
-        video.play().catch(() => {});
-        setMessage("Live via HLS.");
-      });
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (cancelled) return;
-        if (data?.fatal && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          hls.startLoad();
-        }
-      });
-    }
-
-    async function connectWebrtcThenFallback() {
-      if (typeof window === "undefined" || !window.RTCPeerConnection || !webrtcUrl) {
-        connectHls();
-        return;
-      }
-
       try {
         const pc = new window.RTCPeerConnection({
           iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
         });
         peerConnectionRef.current = pc;
+        setMessage("Conectando via WebRTC...");
         pc.addTransceiver("video", { direction: "recvonly" });
         pc.addTransceiver("audio", { direction: "recvonly" });
+        pc.onconnectionstatechange = () => {
+          if (cancelled) return;
+          if (pc.connectionState === "connected") {
+            setMessage("Live via WebRTC.");
+          }
+        };
         pc.ontrack = (event) => {
           if (cancelled) return;
           const stream = event.streams?.[0];
@@ -4424,13 +4385,12 @@ function StreamingPageLite({ clientSlug = "" }) {
         const answer = await response.text();
         await pc.setRemoteDescription({ type: "answer", sdp: answer });
       } catch {
-        peerConnectionRef.current?.close?.();
-        peerConnectionRef.current = null;
-        connectHls();
+        setStatus("error");
+        setMessage("Falha ao conectar WebRTC.");
       }
     }
 
-    connectWebrtcThenFallback();
+    connectWebrtcOnly();
 
     return () => {
       cancelled = true;
