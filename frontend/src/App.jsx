@@ -1660,7 +1660,11 @@ function StreamingChatPanel({ chatDraft, chatListRef, chatMessages, handleSendCh
             {userName || STREAM_CHAT_USER}
           </button>
         </div>
-        <div className="h-[290px] space-y-4 overflow-y-auto p-4" ref={chatListRef}>
+        <div
+          className="h-[290px] min-h-0 space-y-4 overflow-y-scroll overscroll-contain p-4 touch-pan-y"
+          ref={chatListRef}
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           {!chatMessages.length ? (
             <div className="rounded-xl border border-[#414a34] bg-[#181c1b] p-4 text-sm text-[#c0caad]">
               Seja o primeiro a comentar nessa live.
