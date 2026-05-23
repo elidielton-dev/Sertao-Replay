@@ -1024,7 +1024,13 @@ function CampoPage({ fieldId, clientSlug = "" }) {
   );
 }
 
-const replayHourFilters = Array.from({ length: 15 }, (_, index) => {
+const replayHourFilters = [
+  {
+    key: "all",
+    start: null,
+    label: "Todos",
+  },
+  ...Array.from({ length: 15 }, (_, index) => {
   const start = 8 + index;
   const end = start + 1;
   const startLabel = String(start).padStart(2, "0");
@@ -1034,7 +1040,8 @@ const replayHourFilters = Array.from({ length: 15 }, (_, index) => {
     start,
     label: `${startLabel}:00 - ${endLabel}:00`,
   };
-});
+}),
+];
 
 function replayDurationLabel(duration) {
   const seconds = Number(duration) || 15;
@@ -1195,7 +1202,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
-  const [selectedHourStart, setSelectedHourStart] = useState(8);
+  const [selectedHourStart, setSelectedHourStart] = useState(null);
   const field = registeredFields.find((item) => item.id === String(fieldId));
   const camera = field?.cameras.find((item) => item.id === String(cameraId));
   const previewImage = camera?.image || cameraTemplate(cameraId || 1).image;
@@ -1208,7 +1215,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
       return false;
     }
     if (selectedHourStart == null) {
-      return hour >= 8 && hour < 23;
+      return true;
     }
     return hour >= selectedHourStart && hour < selectedHourStart + 1;
   });
