@@ -190,10 +190,24 @@ async function apiRequest(path, { token, bearerToken, ...options } = {}) {
     ...(options.headers || {}),
   };
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const timeoutMs = Number(options.timeoutMs || 10000);
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("Tempo de resposta excedido. Tente novamente.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
@@ -4094,7 +4108,7 @@ function ClientRouteGate({ slug, children }) {
     setStatus("checking");
     setMessage("");
 
-    apiRequest(`/public/clients/${encodeURIComponent(slug)}`)
+    apiRequest(`/public/clients/${encodeURIComponent(slug)}`, { timeoutMs: 7000 })
       .then(() => {
         if (active) {
           setStatus("active");
@@ -4102,6 +4116,11 @@ function ClientRouteGate({ slug, children }) {
       })
       .catch((error) => {
         if (active) {
+          // Do not keep the athlete screen blocked if client validation times out.
+          if ((error?.message || "").toLowerCase().includes("tempo de resposta")) {
+            setStatus("active");
+            return;
+          }
           setStatus("unavailable");
           setMessage(error.message);
         }
