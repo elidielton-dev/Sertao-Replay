@@ -4192,6 +4192,121 @@ class AppErrorBoundary extends Component {
   }
 }
 
+function StreamingPageLite({ clientSlug = "" }) {
+  const videoRef = useRef(null);
+  const hlsRef = useRef(null);
+  const [status, setStatus] = useState("loading");
+  const [message, setMessage] = useState("Carregando live...");
+  const [selectedCamera, setSelectedCamera] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        const cameraData = await apiRequest(clientApiPath(clientSlug, "/cameras"), { timeoutMs: 10000 });
+        const enabled = Array.isArray(cameraData) ? cameraData.filter((camera) => camera.enabled !== false) : [];
+        const camera = enabled.find((item) => item.status === "recording") || enabled[0] || null;
+        if (!mounted) return;
+        setSelectedCamera(camera);
+        if (!camera) {
+          setStatus("error");
+          setMessage("Nenhuma camera ativa para este cliente.");
+          return;
+        }
+        setStatus("ready");
+        setMessage("Live carregada.");
+      } catch (error) {
+        if (!mounted) return;
+        setStatus("error");
+        setMessage(error.message || "Nao foi possivel carregar a live.");
+      }
+    }
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [clientSlug]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    hlsRef.current?.destroy();
+    hlsRef.current = null;
+    if (!video || !selectedCamera) {
+      return undefined;
+    }
+
+    const hlsUrl = hlsUrlForCamera(selectedCamera);
+    if (!hlsUrl) {
+      setStatus("error");
+      setMessage("URL de live indisponivel.");
+      return undefined;
+    }
+
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = hlsUrl;
+      video.play().catch(() => {});
+      return undefined;
+    }
+
+    if (!Hls.isSupported()) {
+      setStatus("error");
+      setMessage("Navegador sem suporte a HLS.");
+      return undefined;
+    }
+
+    const hls = new Hls({
+      lowLatencyMode: false,
+      backBufferLength: 90,
+      maxBufferLength: 20,
+      enableWorker: true,
+    });
+    hlsRef.current = hls;
+    hls.loadSource(hlsUrl);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      video.play().catch(() => {});
+    });
+    hls.on(Hls.Events.ERROR, (_, data) => {
+      if (data?.fatal) {
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          hls.startLoad();
+          return;
+        }
+        setStatus("error");
+        setMessage("Live indisponivel no momento.");
+      }
+    });
+
+    return () => {
+      hls.destroy();
+      if (hlsRef.current === hls) {
+        hlsRef.current = null;
+      }
+    };
+  }, [selectedCamera]);
+
+  return (
+    <main className="min-h-screen bg-black px-3 pb-8 pt-20 text-white sm:px-4 md:px-8">
+      <nav className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-[#8ddc00]/30 bg-[#101413]/95 px-4">
+        <a className="flex items-center no-underline" href={clientPath(clientSlug, "/")}>
+          <img alt="Sertao Replay" className="h-10 w-auto object-contain" src="/assets/logo-sertao-replay-nav.png" />
+        </a>
+        <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${status === "ready" ? "bg-[#a1fb00] text-black" : "bg-red-500 text-white"}`}>
+          {status === "ready" ? "Ao vivo" : "Offline"}
+        </span>
+      </nav>
+
+      <section className="mx-auto w-full max-w-6xl">
+        <div className="mb-3 text-sm text-[#c0caad]">{message}</div>
+        <div className="overflow-hidden rounded-xl border border-[#8ddc00]/25 bg-black">
+          <video ref={videoRef} autoPlay controls muted playsInline className="aspect-video w-full bg-black object-contain" />
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function AppRoutes() {
   const path = window.location.pathname;
   const tenantAdminMatch = path.match(/^\/admin\/([^/]+)(?:\/(dashboard))?\/?$/);
@@ -4225,7 +4340,7 @@ function AppRoutes() {
     }
 
     if (lowerRoute === "streaming") {
-      return <ClientRouteGate slug={clientSlug}><StreamingPage clientSlug={clientSlug} /></ClientRouteGate>;
+      return <ClientRouteGate slug={clientSlug}><StreamingPageLite clientSlug={clientSlug} /></ClientRouteGate>;
     }
 
     if (["highlights", "highlight", "higliyhet"].includes(lowerRoute)) {
@@ -4304,7 +4419,7 @@ function AppRoutes() {
   }
 
   if (window.location.pathname.startsWith("/streaming")) {
-    return <StreamingPage />;
+    return <StreamingPageLite />;
   }
 
   if (["/highlights", "/highlight", "/higliyhet"].some((route) => window.location.pathname.startsWith(route))) {
