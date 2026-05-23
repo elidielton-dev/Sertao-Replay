@@ -132,7 +132,9 @@ function formatDate(value) {
     return "Data indisponivel";
   }
 
-  const date = new Date(value);
+  const normalizedValue =
+    typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value) ? `${value}Z` : value;
+  const date = new Date(normalizedValue);
   if (Number.isNaN(date.getTime())) {
     return "Data indisponivel";
   }
@@ -145,7 +147,9 @@ function formatDate(value) {
 }
 
 function getSaoPauloHour(value) {
-  const date = new Date(value);
+  const normalizedValue =
+    typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value) ? `${value}Z` : value;
+  const date = new Date(normalizedValue);
   if (Number.isNaN(date.getTime())) {
     return null;
   }
