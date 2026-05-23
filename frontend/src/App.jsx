@@ -31,7 +31,7 @@
   X,
 } from "lucide-react";
 import Hls from "hls.js";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Component, useCallback, useEffect, useRef, useState } from "react";
 
 const DEFAULT_API_BASE =
   typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
@@ -4161,7 +4161,38 @@ function ClientRouteGate({ slug, children }) {
   return children;
 }
 
-export default function App() {
+class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, message: "" };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, message: error?.message || "Falha ao carregar a pagina." };
+  }
+
+  componentDidCatch(error) {
+    console.error("App render error:", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <main className="min-h-screen bg-[#101413] px-4 py-10 text-white">
+          <div className="mx-auto max-w-2xl rounded-2xl border border-red-400/40 bg-black/40 p-6">
+            <h1 className="m-0 text-xl font-black text-red-300">Erro ao abrir a pagina</h1>
+            <p className="mt-3 mb-0 text-sm text-gray-200">{this.state.message}</p>
+            <p className="mt-3 mb-0 text-xs text-gray-400">Atualize com Ctrl+F5. Se persistir, o deploy mais novo ja inclui correcao de fallback.</p>
+          </div>
+        </main>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function AppRoutes() {
   const path = window.location.pathname;
   const tenantAdminMatch = path.match(/^\/admin\/([^/]+)(?:\/(dashboard))?\/?$/);
 
@@ -4289,4 +4320,12 @@ export default function App() {
   }
 
   return <HomePage />;
+}
+
+export default function App() {
+  return (
+    <AppErrorBoundary>
+      <AppRoutes />
+    </AppErrorBoundary>
+  );
 }
