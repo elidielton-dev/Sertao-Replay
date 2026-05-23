@@ -1429,7 +1429,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
             </div>
           </section>
 
-          <section className="mb-6 overflow-hidden" data-purpose="replay-duration-filters">
+          <section className="mb-6 overflow-visible" data-purpose="replay-duration-filters">
             <div className="relative w-full max-w-sm">
               <button
                 className="flex min-h-11 w-full items-center justify-between rounded-xl border border-white/10 bg-[#1c221e] px-4 py-2 text-left text-sm font-medium text-white transition hover:border-[#79e043]/60"
