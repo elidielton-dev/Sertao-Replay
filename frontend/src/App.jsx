@@ -4269,7 +4269,7 @@ function StreamingPageLite({ clientSlug = "" }) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STREAM_CHAT_STORAGE_KEY, JSON.stringify(chatMessages.slice(-4)));
+      window.localStorage.setItem(STREAM_CHAT_STORAGE_KEY, JSON.stringify(chatMessages.slice(-40)));
     } catch {
       // localStorage can be unavailable.
     }
@@ -4298,7 +4298,7 @@ function StreamingPageLite({ clientSlug = "" }) {
         const data = await apiRequest(`/chat/messages?camera_id=${encodeURIComponent(selectedCamera.id)}&limit=80${clientQuery}`);
         if (!cancelled && Array.isArray(data)) {
           // Keep only the most recent messages, like live chats.
-          setChatMessages(data.map(normalizeChatMessage).slice(-4));
+          setChatMessages(data.map(normalizeChatMessage).slice(-40));
         }
       } catch {
         if (!cancelled) {
@@ -4409,7 +4409,7 @@ function StreamingPageLite({ clientSlug = "" }) {
           <StreamingChatPanel
             chatDraft={chatDraft}
             chatListRef={chatListRef}
-            chatMessages={chatMessages.slice(-4)}
+            chatMessages={chatMessages}
             handleSendChat={async (event) => {
               event.preventDefault();
               const text = chatDraft.trim();
@@ -4437,9 +4437,9 @@ function StreamingPageLite({ clientSlug = "" }) {
                     text,
                   }),
                 });
-                setChatMessages((current) => [...current.slice(-3), normalizeChatMessage(saved)]);
+                setChatMessages((current) => [...current.slice(-39), normalizeChatMessage(saved)]);
               } catch {
-                setChatMessages((current) => [...current.slice(-3), fallbackMessage]);
+                setChatMessages((current) => [...current.slice(-39), fallbackMessage]);
               }
             }}
             setChatDraft={setChatDraft}
