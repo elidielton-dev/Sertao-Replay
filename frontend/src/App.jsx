@@ -4383,6 +4383,7 @@ function StreamingPageLite({ clientSlug = "" }) {
     ? replays.filter((replay) => replay.status === "ready" && replay.camera_id === selectedCamera.id && replay.video_url).slice(0, 6)
     : [];
   const previewReplay = cameraReplays.find((replay) => String(replay.id) === previewReplayId) || null;
+  const recentChatMessages = chatMessages.slice(-5);
 
   return (
     <main className="min-h-screen bg-black px-3 pb-8 pt-20 text-white sm:px-4 md:px-8">
@@ -4399,13 +4400,13 @@ function StreamingPageLite({ clientSlug = "" }) {
         <div className="mb-3 text-sm text-[#c0caad]">{message}</div>
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="overflow-hidden rounded-xl border border-[#8ddc00]/25 bg-black">
-            <video ref={videoRef} autoPlay controls muted playsInline className="aspect-video w-full bg-black object-contain" />
+            <video ref={videoRef} autoPlay controls muted playsInline className="aspect-video w-full bg-black object-cover object-center" />
           </div>
 
           <StreamingChatPanel
             chatDraft={chatDraft}
             chatListRef={chatListRef}
-            chatMessages={chatMessages}
+            chatMessages={recentChatMessages}
             handleSendChat={async (event) => {
               event.preventDefault();
               const text = chatDraft.trim();
@@ -4441,6 +4442,7 @@ function StreamingPageLite({ clientSlug = "" }) {
             setChatDraft={setChatDraft}
             userName={chatUserName}
             onChangeUser={() => setShowChatNameModal(true)}
+            className="lg:sticky lg:top-24 lg:h-[calc(100vh-120px)]"
           />
         </div>
 
