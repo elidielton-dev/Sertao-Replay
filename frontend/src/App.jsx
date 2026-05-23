@@ -4327,6 +4327,12 @@ function StreamingPageLite({ clientSlug = "" }) {
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
+      const seekToStableDelay = () => {
+        if (Number.isFinite(video.duration) && video.duration > 6) {
+          video.currentTime = Math.max(0, video.duration - 5);
+        }
+      };
+      video.addEventListener("loadedmetadata", seekToStableDelay, { once: true });
       video.play().catch(() => {});
       return undefined;
     }
@@ -4341,7 +4347,8 @@ function StreamingPageLite({ clientSlug = "" }) {
       lowLatencyMode: true,
       backBufferLength: 45,
       maxBufferLength: 12,
-      liveSyncDurationCount: 2,
+      liveSyncDuration: 5,
+      liveMaxLatencyDuration: 10,
       maxLiveSyncPlaybackRate: 1.2,
       enableWorker: true,
     });
