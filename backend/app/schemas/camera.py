@@ -11,6 +11,9 @@ class CameraCreate(BaseModel):
     slug: str | None = Field(default=None, max_length=120, pattern=r"^[a-zA-Z0-9_-]+$")
     rtsp_url: str | None = Field(default=None, max_length=500)
     enabled: bool = True
+    live_enabled: bool = False
+    live_title: str | None = Field(default=None, max_length=180)
+    live_description: str | None = Field(default=None, max_length=1200)
     notes: str | None = Field(default=None, max_length=1000)
 
     @field_validator("id", "name")
@@ -27,7 +30,7 @@ class CameraCreate(BaseModel):
         cleaned = value.strip()
         return cleaned or None
 
-    @field_validator("notes")
+    @field_validator("notes", "live_title", "live_description")
     @classmethod
     def strip_optional_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -56,6 +59,9 @@ class AdminCameraCreate(BaseModel):
     id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
     name: str = Field(min_length=1, max_length=120)
     camera_ip: str = Field(min_length=3, max_length=500)
+    live_enabled: bool = False
+    live_title: str | None = Field(default=None, max_length=180)
+    live_description: str | None = Field(default=None, max_length=1200)
 
     @field_validator("id", "name")
     @classmethod
@@ -89,6 +95,14 @@ class AdminCameraCreate(BaseModel):
             raise ValueError("Informe uma porta valida para a camera.")
         return cleaned
 
+    @field_validator("live_title", "live_description")
+    @classmethod
+    def strip_live_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
 
 class Camera(CameraCreate):
     client_id: str = "default"
@@ -105,6 +119,9 @@ class PublicCamera(BaseModel):
     slug: str | None = None
     status: str = "unknown"
     enabled: bool = True
+    live_enabled: bool = False
+    live_title: str | None = None
+    live_description: str | None = None
     notes: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

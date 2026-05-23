@@ -20,6 +20,9 @@ class CameraConfig(Base):
     rtsp_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="unknown", index=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    live_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    live_title: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    live_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

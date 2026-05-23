@@ -2697,6 +2697,9 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
     id: "",
     name: "",
     camera_ip: "",
+    live_enabled: false,
+    live_title: "",
+    live_description: "",
   });
   const [fieldForm, setFieldForm] = useState({
     field_name: "",
@@ -2765,7 +2768,7 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
   }
 
   function resetCameraForm() {
-    setCameraForm({ id: "", name: "", camera_ip: "" });
+    setCameraForm({ id: "", name: "", camera_ip: "", live_enabled: false, live_title: "", live_description: "" });
   }
 
   function resetFieldForm() {
@@ -2781,6 +2784,9 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
       id: camera.id || "",
       name: camera.name || "",
       camera_ip: camera.rtsp_url || "",
+      live_enabled: camera.live_enabled === true,
+      live_title: camera.live_title || "",
+      live_description: camera.live_description || "",
     });
   }
 
@@ -2812,6 +2818,9 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
       id: cameraForm.id.trim(),
       name: cameraForm.name.trim(),
       camera_ip: cameraForm.camera_ip.trim(),
+      live_enabled: cameraForm.live_enabled === true,
+      live_title: cameraForm.live_title.trim() || null,
+      live_description: cameraForm.live_description.trim() || null,
     };
 
     setBusy(true);
@@ -2882,6 +2891,9 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
       id: cameraBackendId,
       name: `${fieldName} - ${cameraName}`,
       camera_ip: fieldForm.camera_ip.trim(),
+      live_enabled: false,
+      live_title: null,
+      live_description: null,
     };
 
     setBusy(true);
@@ -3133,6 +3145,33 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
                   required
                 />
 
+                <label className="tenant-admin-toggle" htmlFor="tenantCameraLiveEnabled">
+                  <input
+                    id="tenantCameraLiveEnabled"
+                    type="checkbox"
+                    checked={cameraForm.live_enabled}
+                    onChange={(event) => updateCameraForm("live_enabled", event.target.checked)}
+                  />
+                  Live online neste camera
+                </label>
+
+                <label htmlFor="tenantCameraLiveTitle">Titulo da live</label>
+                <input
+                  id="tenantCameraLiveTitle"
+                  value={cameraForm.live_title}
+                  onChange={(event) => updateCameraForm("live_title", event.target.value)}
+                  placeholder="Ex: Final do Campeonato - Campo 1"
+                />
+
+                <label htmlFor="tenantCameraLiveDescription">Descricao da live</label>
+                <textarea
+                  id="tenantCameraLiveDescription"
+                  value={cameraForm.live_description}
+                  onChange={(event) => updateCameraForm("live_description", event.target.value)}
+                  placeholder="Informacoes da transmissao para o publico."
+                  rows={3}
+                />
+
                 <div className="tenant-admin-form-actions">
                   <button className="tenant-admin-primary" type="submit" disabled={busy}>{busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />} Salvar camera</button>
                 </div>
@@ -3147,7 +3186,10 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
               <div className="tenant-admin-camera-list">
                 {cameras.map((camera) => (
                   <button className="tenant-admin-camera-row" onClick={() => editTenantCamera(camera)} type="button" key={camera.id}>
-                    <span><strong>{camera.name}</strong><small>{camera.id} · /{clientSlug}/campo/{camera.slug || camera.id}</small></span>
+                    <span>
+                      <strong>{camera.name}</strong>
+                      <small>{camera.id} · /{clientSlug}/campo/{camera.slug || camera.id} · live {camera.live_enabled ? "online" : "offline"}</small>
+                    </span>
                     <em className={camera.status === "recording" ? "is-online" : "is-offline"}>{camera.status || "unknown"}</em>
                   </button>
                 ))}
@@ -4224,17 +4266,18 @@ function StreamingPageLite({ clientSlug = "" }) {
           apiRequest(clientApiPath(clientSlug, "/replays"), { timeoutMs: 10000 }),
         ]);
         const enabled = Array.isArray(cameraData) ? cameraData.filter((camera) => camera.enabled !== false) : [];
-        const camera = enabled.find((item) => item.status === "recording") || enabled[0] || null;
+        const liveEnabled = enabled.filter((camera) => camera.live_enabled === true);
+        const camera = liveEnabled.find((item) => item.status === "recording") || liveEnabled[0] || null;
         if (!mounted) return;
         setSelectedCamera(camera);
         setReplays(Array.isArray(replayData) ? replayData : []);
         if (!camera) {
           setStatus("error");
-          setMessage("Nenhuma camera ativa para este cliente.");
+          setMessage("Live desativada no admin deste cliente.");
           return;
         }
         setStatus("ready");
-        setMessage("Live carregada.");
+        setMessage(camera.live_title || "Live carregada.");
       } catch (error) {
         if (!mounted) return;
         setStatus("error");
@@ -4391,6 +4434,8 @@ function StreamingPageLite({ clientSlug = "" }) {
     ? replays.filter((replay) => replay.status === "ready" && replay.camera_id === selectedCamera.id && replay.video_url).slice(0, 6)
     : [];
   const previewReplay = cameraReplays.find((replay) => String(replay.id) === previewReplayId) || null;
+  const liveTitle = selectedCamera?.live_title || selectedCamera?.name || "Transmissao ao vivo";
+  const liveDescription = selectedCamera?.live_description || "Live controlada pelo admin do cliente.";
 
   return (
     <main className="min-h-screen bg-black px-3 pb-8 pt-20 text-white sm:px-4 md:px-8">
@@ -4405,6 +4450,10 @@ function StreamingPageLite({ clientSlug = "" }) {
 
       <section className="mx-auto w-full max-w-6xl">
         <div className="mb-3 text-sm text-[#c0caad]">{message}</div>
+        <div className="mb-4 rounded-xl border border-[#8ddc00]/25 bg-[#101413] p-4">
+          <h1 className="text-lg font-black text-[#a1fb00]">{liveTitle}</h1>
+          <p className="mt-1 text-sm text-[#c0caad]">{liveDescription}</p>
+        </div>
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="overflow-hidden rounded-xl border border-[#8ddc00]/25 bg-black">
             <video ref={videoRef} autoPlay controls muted playsInline className="aspect-video w-full bg-black object-contain" />

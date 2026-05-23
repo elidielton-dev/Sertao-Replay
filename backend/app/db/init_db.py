@@ -29,6 +29,9 @@ def _run_lightweight_migrations() -> None:
             connection.execute(text("ALTER TABLE cameras ADD COLUMN IF NOT EXISTS rtsp_url VARCHAR(500)"))
             connection.execute(text("ALTER TABLE cameras ADD COLUMN IF NOT EXISTS client_id VARCHAR(64) NOT NULL DEFAULT 'arena-society-custodia'"))
             connection.execute(text("ALTER TABLE cameras ADD COLUMN IF NOT EXISTS slug VARCHAR(120) NOT NULL DEFAULT ''"))
+            connection.execute(text("ALTER TABLE cameras ADD COLUMN IF NOT EXISTS live_enabled BOOLEAN NOT NULL DEFAULT FALSE"))
+            connection.execute(text("ALTER TABLE cameras ADD COLUMN IF NOT EXISTS live_title VARCHAR(180)"))
+            connection.execute(text("ALTER TABLE cameras ADD COLUMN IF NOT EXISTS live_description TEXT"))
             connection.execute(text("ALTER TABLE replays ADD COLUMN IF NOT EXISTS client_id VARCHAR(64) NOT NULL DEFAULT 'arena-society-custodia'"))
             connection.execute(text("ALTER TABLE replays ADD COLUMN IF NOT EXISTS thumbnail_url VARCHAR(500)"))
             connection.execute(text("ALTER TABLE replays ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE"))
@@ -74,6 +77,18 @@ def _run_lightweight_migrations() -> None:
         if "notes" not in camera_columns:
             connection.execute(text("ALTER TABLE cameras ADD COLUMN notes TEXT"))
             logger.info("Migracao aplicada: cameras.notes.")
+
+        if "live_enabled" not in camera_columns:
+            connection.execute(text("ALTER TABLE cameras ADD COLUMN live_enabled BOOLEAN NOT NULL DEFAULT 0"))
+            logger.info("Migracao aplicada: cameras.live_enabled.")
+
+        if "live_title" not in camera_columns:
+            connection.execute(text("ALTER TABLE cameras ADD COLUMN live_title VARCHAR(180)"))
+            logger.info("Migracao aplicada: cameras.live_title.")
+
+        if "live_description" not in camera_columns:
+            connection.execute(text("ALTER TABLE cameras ADD COLUMN live_description TEXT"))
+            logger.info("Migracao aplicada: cameras.live_description.")
 
         if "rtsp_url" not in camera_columns:
             connection.execute(text("ALTER TABLE cameras ADD COLUMN rtsp_url VARCHAR(500)"))

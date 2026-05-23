@@ -68,6 +68,9 @@ class CameraService:
             if camera.rtsp_url is not None:
                 record.rtsp_url = camera.rtsp_url
             record.enabled = camera.enabled
+            record.live_enabled = camera.live_enabled
+            record.live_title = camera.live_title
+            record.live_description = camera.live_description
             record.notes = camera.notes
             message = "Camera atualizada no banco de dados."
         else:
@@ -88,6 +91,9 @@ class CameraService:
             slug=payload.id,
             rtsp_url=rtsp_url,
             enabled=True,
+            live_enabled=payload.live_enabled,
+            live_title=payload.live_title,
+            live_description=payload.live_description,
             notes=f"Camera cadastrada automaticamente por {payload.camera_ip}.",
         )
         return self.save_camera(db, camera, client_id=client_id)
@@ -259,6 +265,9 @@ class CameraService:
             slug=record.slug or record.id,
             rtsp_url=record.rtsp_url,
             enabled=record.enabled,
+            live_enabled=record.live_enabled,
+            live_title=record.live_title,
+            live_description=record.live_description,
             status=record.status,
             notes=record.notes,
             created_at=record.created_at,
@@ -272,6 +281,9 @@ class CameraService:
             name=record.name,
             slug=record.slug or record.id,
             enabled=record.enabled,
+            live_enabled=record.live_enabled,
+            live_title=record.live_title,
+            live_description=record.live_description,
             status=record.status,
             notes=record.notes,
             created_at=record.created_at,
