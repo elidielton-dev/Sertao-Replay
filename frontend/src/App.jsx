@@ -132,10 +132,34 @@ function formatDate(value) {
     return "Data indisponivel";
   }
 
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Data indisponivel";
+  }
+
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
-  }).format(new Date(value));
+    timeZone: "America/Sao_Paulo",
+  }).format(date);
+}
+
+function getSaoPauloHour(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const hourPart = new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    hourCycle: "h23",
+    timeZone: "America/Sao_Paulo",
+  })
+    .formatToParts(date)
+    .find((part) => part.type === "hour")?.value;
+
+  const hour = Number(hourPart);
+  return Number.isNaN(hour) ? null : hour;
 }
 
 function mediaUrl(value) {
@@ -1000,7 +1024,17 @@ function CampoPage({ fieldId, clientSlug = "" }) {
   );
 }
 
-const replayFilters = ["15s", "30s", "60s", "Gol", "Defesa", "Lance bonito"];
+const replayHourFilters = Array.from({ length: 15 }, (_, index) => {
+  const start = 8 + index;
+  const end = start + 1;
+  const startLabel = String(start).padStart(2, "0");
+  const endLabel = String(end).padStart(2, "0");
+  return {
+    key: `${start}-${end}`,
+    start,
+    label: `${startLabel}:00 - ${endLabel}:00`,
+  };
+});
 
 function replayDurationLabel(duration) {
   const seconds = Number(duration) || 15;
@@ -1161,12 +1195,23 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
+  const [selectedHourStart, setSelectedHourStart] = useState(8);
   const field = registeredFields.find((item) => item.id === String(fieldId));
   const camera = field?.cameras.find((item) => item.id === String(cameraId));
   const previewImage = camera?.image || cameraTemplate(cameraId || 1).image;
-  const cameraReplays = camera
+  const cameraReplaysRaw = camera
     ? replays.filter((replay) => replay.status === "ready" && replay.camera_id === camera.backendId && replay.video_url)
     : [];
+  const cameraReplays = cameraReplaysRaw.filter((replay) => {
+    const hour = getSaoPauloHour(replay.created_at);
+    if (hour == null) {
+      return false;
+    }
+    if (selectedHourStart == null) {
+      return hour >= 8 && hour < 23;
+    }
+    return hour >= selectedHourStart && hour < selectedHourStart + 1;
+  });
   const selectedReplay = cameraReplays.find((replay) => String(replay.id) === selectedReplayId) || cameraReplays[0] || null;
   const selectedVideoUrl = selectedReplay ? mediaUrl(selectedReplay.video_url) : "";
   const selectedDownloadUrl = selectedReplay ? mediaUrl(selectedReplay.download_url || selectedReplay.video_url) : "";
@@ -1309,10 +1354,10 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
           ) : null}
 
           <section className="relative mb-6 overflow-hidden rounded-2xl shadow-[0_0_20px_rgba(121,224,67,0.1)]" data-purpose="live-video-player">
-            <div className="relative aspect-video bg-black">
+            <div className="relative mx-auto w-full max-w-[420px] overflow-hidden rounded-2xl bg-black" style={{ aspectRatio: "9 / 16" }}>
               {selectedReplay ? (
                 <video
-                  className="h-full w-full bg-black object-contain"
+                  className="h-full w-full bg-black object-cover object-center"
                   controls
                   key={selectedReplay.id}
                   playsInline
@@ -1321,7 +1366,7 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
                   src={selectedVideoUrl}
                 />
               ) : (
-                <img alt="Campo de futebol" className="h-full w-full object-cover" src={previewImage} />
+                <img alt="Campo de futebol" className="h-full w-full object-cover object-center" src={previewImage} />
               )}
 
               <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/40 px-3 py-1 backdrop-blur-sm sm:left-4 sm:top-4">
@@ -1377,20 +1422,20 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
 
           <section className="mb-6 overflow-hidden" data-purpose="replay-duration-filters">
             <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2">
-              {replayFilters.map((filter, index) => (
+              {replayHourFilters.map((filter) => (
                 <button
                   className={`min-h-10 whitespace-nowrap rounded-xl border px-4 py-2 text-sm font-medium sm:px-6 ${
-                    index === 0 ? "border-[#79e043] bg-transparent text-[#79e043]" : "border-white/10 bg-[#1c221e] text-white"
+                    selectedHourStart === filter.start
+                      ? "border-[#79e043] bg-transparent text-[#79e043]"
+                      : "border-white/10 bg-[#1c221e] text-white"
                   }`}
-                  key={filter}
+                  key={filter.key}
+                  onClick={() => setSelectedHourStart(filter.start)}
                   type="button"
                 >
-                  {filter}
+                  {filter.label}
                 </button>
               ))}
-              <button className="min-h-10 shrink-0 rounded-xl border border-white/10 bg-[#1c221e] px-5 py-2 text-white" type="button" aria-label="Mais filtros">
-                <ChevronIcon className="h-4 w-4" />
-              </button>
             </div>
           </section>
         </section>
