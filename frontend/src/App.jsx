@@ -1721,9 +1721,9 @@ function StreamingPage({ clientSlug = "" }) {
   const [webrtcConfigVersion, setWebrtcConfigVersion] = useState(0);
   const [chatMessages, setChatMessages] = useState(() => loadStoredChatMessages());
   const [chatDraft, setChatDraft] = useState("");
-  const [chatUserName, setChatUserName] = useState(() => loadStoredChatUser(clientSlug));
-  const [chatNameDraft, setChatNameDraft] = useState(() => loadStoredChatUser(clientSlug));
-  const [showChatNameModal, setShowChatNameModal] = useState(() => !loadStoredChatUser(clientSlug));
+  const [chatUserName, setChatUserName] = useState(() => loadStoredChatUser(clientSlug) || STREAM_CHAT_USER);
+  const [chatNameDraft, setChatNameDraft] = useState(() => loadStoredChatUser(clientSlug) || STREAM_CHAT_USER);
+  const [showChatNameModal, setShowChatNameModal] = useState(false);
   const [previewReplayId, setPreviewReplayId] = useState("");
 
   const requestReplayFromStreaming = useCallback(async (seconds = 15) => {
@@ -1758,9 +1758,10 @@ function StreamingPage({ clientSlug = "" }) {
 
   useEffect(() => {
     const storedUser = loadStoredChatUser(clientSlug);
-    setChatUserName(storedUser);
-    setChatNameDraft(storedUser);
-    setShowChatNameModal(!storedUser);
+    const safeUser = storedUser || STREAM_CHAT_USER;
+    setChatUserName(safeUser);
+    setChatNameDraft(safeUser);
+    setShowChatNameModal(false);
   }, [clientSlug]);
 
   useEffect(() => {
@@ -1925,20 +1926,30 @@ function StreamingPage({ clientSlug = "" }) {
       }
 
       const hls = new Hls({
-        lowLatencyMode: true,
-        backBufferLength: 30,
+        lowLatencyMode: false,
+        backBufferLength: 90,
+        liveSyncDurationCount: 3,
+        maxBufferLength: 20,
+        enableWorker: true,
       });
       hlsRef.current = hls;
       hls.loadSource(effectiveHlsUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (!cancelled) {
+          if (Number.isFinite(hls.liveSyncPosition)) {
+            video.currentTime = hls.liveSyncPosition;
+          }
           video.play().catch(() => {});
           setWebrtcStatus("receiving");
         }
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (!cancelled && data?.fatal) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            hls.startLoad();
+            return;
+          }
           setWebrtcStatus("error");
           setWebrtcError("A live HLS ainda nao esta recebendo video do servidor publico.");
           scheduleWebrtcReconnect();
