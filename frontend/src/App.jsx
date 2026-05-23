@@ -1646,7 +1646,7 @@ function normalizeChatMessage(item) {
 
 function StreamingChatPanel({ chatDraft, chatListRef, chatMessages, handleSendChat, setChatDraft, userName, onChangeUser, className = "" }) {
   return (
-    <section className={`flex min-h-[360px] min-w-0 flex-col sm:min-h-[420px] ${className}`} data-purpose="streaming-chat">
+    <section className={`flex h-[520px] min-h-0 min-w-0 flex-col ${className}`} data-purpose="streaming-chat">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#8ddc00]/20 bg-[#101413]/75 backdrop-blur-xl">
         <div className="flex items-center justify-between border-b border-[#8ddc00]/20 bg-[#272b29] p-4">
           <h2 className="m-0 flex items-center gap-2 font-bold text-[#a1fb00]">
@@ -1660,7 +1660,7 @@ function StreamingChatPanel({ chatDraft, chatListRef, chatMessages, handleSendCh
             {userName || STREAM_CHAT_USER}
           </button>
         </div>
-        <div className="flex-1 space-y-4 overflow-y-auto p-4" ref={chatListRef}>
+        <div className="flex-1 space-y-4 overflow-y-hidden p-4" ref={chatListRef}>
           {!chatMessages.length ? (
             <div className="rounded-xl border border-[#414a34] bg-[#181c1b] p-4 text-sm text-[#c0caad]">
               Seja o primeiro a comentar nessa live.
