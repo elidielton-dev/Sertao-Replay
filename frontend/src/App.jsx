@@ -1203,7 +1203,6 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
   const [error, setError] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
   const [selectedHourStart, setSelectedHourStart] = useState(null);
-  const [isHourFilterOpen, setIsHourFilterOpen] = useState(false);
   const field = registeredFields.find((item) => item.id === String(fieldId));
   const camera = field?.cameras.find((item) => item.id === String(cameraId));
   const previewImage = camera?.image || cameraTemplate(cameraId || 1).image;
@@ -1430,35 +1429,26 @@ function CameraPage({ fieldId: routeFieldId, cameraId: routeCameraId, clientSlug
           </section>
 
           <section className="mb-6 overflow-visible" data-purpose="replay-duration-filters">
-            <div className="relative w-full max-w-sm">
-              <button
-                className="flex min-h-11 w-full items-center justify-between rounded-xl border border-white/10 bg-[#1c221e] px-4 py-2 text-left text-sm font-medium text-white transition hover:border-[#79e043]/60"
-                onClick={() => setIsHourFilterOpen((prev) => !prev)}
-                type="button"
+            <div className="w-full max-w-sm">
+              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[#a0a0a0]" htmlFor="replay-hour-filter">
+                Filtrar por hora
+              </label>
+              <select
+                id="replay-hour-filter"
+                className="min-h-11 w-full rounded-xl border border-white/10 bg-[#1c221e] px-4 py-2 text-sm font-medium text-white outline-none transition focus:border-[#79e043]"
+                value={selectedHourStart == null ? "all" : String(selectedHourStart)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSelectedHourStart(value === "all" ? null : Number(value));
+                }}
               >
-                <span className="truncate">Filtrar por hora: {selectedHourFilter.label}</span>
-                <span className="ml-3 text-[#79e043]">{isHourFilterOpen ? "▲" : "▼"}</span>
-              </button>
-
-              {isHourFilterOpen ? (
-                <div className="absolute z-30 mt-2 max-h-64 w-full overflow-auto rounded-xl border border-white/10 bg-[#121714] p-1 shadow-xl">
-                  {replayHourFilters.map((filter) => (
-                    <button
-                      className={`block w-full rounded-lg px-3 py-2 text-left text-sm ${
-                        selectedHourStart === filter.start ? "bg-[#79e043]/15 text-[#79e043]" : "text-white hover:bg-white/5"
-                      }`}
-                      key={filter.key}
-                      onClick={() => {
-                        setSelectedHourStart(filter.start);
-                        setIsHourFilterOpen(false);
-                      }}
-                      type="button"
-                    >
-                      {filter.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+                {replayHourFilters.map((filter) => (
+                  <option className="bg-[#121714] text-white" key={filter.key} value={filter.start == null ? "all" : String(filter.start)}>
+                    {filter.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 mb-0 text-xs text-[#a0a0a0]">Selecionado: {selectedHourFilter.label}</p>
             </div>
           </section>
         </section>
