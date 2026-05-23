@@ -4195,7 +4195,6 @@ class AppErrorBoundary extends Component {
 function StreamingPageLite({ clientSlug = "" }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
-  const peerConnectionRef = useRef(null);
   const chatListRef = useRef(null);
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("Carregando live...");
@@ -4316,138 +4315,65 @@ function StreamingPageLite({ clientSlug = "" }) {
     const video = videoRef.current;
     hlsRef.current?.destroy();
     hlsRef.current = null;
-    peerConnectionRef.current?.close?.();
-    peerConnectionRef.current = null;
     if (!video || !selectedCamera) {
       return undefined;
     }
 
     const hlsUrl = hlsUrlForCamera(selectedCamera);
-    const webrtcUrl = webrtcUrlForCamera(selectedCamera);
     if (!hlsUrl) {
       setStatus("error");
       setMessage("URL de live indisponivel.");
       return undefined;
     }
 
-    let cancelled = false;
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = hlsUrl;
+      const seekToStableDelay = () => {
+        if (Number.isFinite(video.duration) && video.duration > 14) {
+          video.currentTime = Math.max(0, video.duration - 12);
+        }
+      };
+      video.addEventListener("loadedmetadata", seekToStableDelay, { once: true });
+      video.play().catch(() => {});
+      return undefined;
+    }
 
-    function connectHls() {
-      if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = hlsUrl;
-        const seekToStableDelay = () => {
-          if (Number.isFinite(video.duration) && video.duration > 14) {
-            video.currentTime = Math.max(0, video.duration - 12);
-          }
-        };
-        video.addEventListener("loadedmetadata", seekToStableDelay, { once: true });
-        video.play().catch(() => {});
-        setMessage("Live via HLS.");
-        return;
-      }
+    if (!Hls.isSupported()) {
+      setStatus("error");
+      setMessage("Navegador sem suporte a HLS.");
+      return undefined;
+    }
 
-      if (!Hls.isSupported()) {
-        setStatus("error");
-        setMessage("Navegador sem suporte a HLS.");
-        return;
-      }
-
-      const hls = new Hls({
-        lowLatencyMode: false,
-        backBufferLength: 90,
-        maxBufferLength: 30,
-        liveSyncDuration: 12,
-        liveMaxLatencyDuration: 20,
-        maxLiveSyncPlaybackRate: 1.05,
-        enableWorker: true,
-      });
-      hlsRef.current = hls;
-      hls.loadSource(hlsUrl);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        if (cancelled) return;
-        video.play().catch(() => {});
-        setMessage("Live via HLS.");
-      });
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (cancelled) return;
-        if (data?.fatal && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+    const hls = new Hls({
+      lowLatencyMode: false,
+      backBufferLength: 90,
+      maxBufferLength: 30,
+      liveSyncDuration: 12,
+      liveMaxLatencyDuration: 20,
+      maxLiveSyncPlaybackRate: 1.05,
+      enableWorker: true,
+    });
+    hlsRef.current = hls;
+    hls.loadSource(hlsUrl);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      video.play().catch(() => {});
+    });
+    hls.on(Hls.Events.ERROR, (_, data) => {
+      if (data?.fatal) {
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
           hls.startLoad();
+          return;
         }
-      });
-    }
-
-    async function connectWebrtcThenFallback() {
-      if (typeof window === "undefined" || !window.RTCPeerConnection || !webrtcUrl) {
-        connectHls();
-        return;
+        setStatus("error");
+        setMessage("Live indisponivel no momento.");
       }
-
-      try {
-        const pc = new window.RTCPeerConnection({
-          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-        });
-        peerConnectionRef.current = pc;
-        pc.addTransceiver("video", { direction: "recvonly" });
-        pc.addTransceiver("audio", { direction: "recvonly" });
-        pc.ontrack = (event) => {
-          if (cancelled) return;
-          const stream = event.streams?.[0];
-          if (stream && video.srcObject !== stream) {
-            video.srcObject = stream;
-            video.play().catch(() => {});
-            setMessage("Live via WebRTC.");
-          }
-        };
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await waitForIceGatheringComplete(pc);
-
-        const controller = new AbortController();
-        const timeoutId = window.setTimeout(() => controller.abort(), 5000);
-        let response;
-        try {
-          response = await fetch(webrtcUrl, {
-            method: "POST",
-            headers: { Accept: "application/sdp", "Content-Type": "application/sdp" },
-            body: pc.localDescription?.sdp || offer.sdp,
-            signal: controller.signal,
-          });
-        } finally {
-          window.clearTimeout(timeoutId);
-        }
-
-        if (!response.ok) {
-          throw new Error(`WebRTC ${response.status}`);
-        }
-        const answer = await response.text();
-        await pc.setRemoteDescription({ type: "answer", sdp: answer });
-      } catch {
-        peerConnectionRef.current?.close?.();
-        peerConnectionRef.current = null;
-        connectHls();
-      }
-    }
-
-    connectWebrtcThenFallback();
+    });
 
     return () => {
-      cancelled = true;
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
+      hls.destroy();
+      if (hlsRef.current === hls) {
         hlsRef.current = null;
-      }
-      if (video) {
-        if (video.srcObject) {
-          video.srcObject.getTracks?.().forEach((track) => track.stop());
-          video.srcObject = null;
-        }
-        video.removeAttribute("src");
       }
     };
   }, [selectedCamera]);
