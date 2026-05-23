@@ -56,6 +56,9 @@ class CaptureServer:
         self.replay_audio_codec = os.getenv("REPLAY_AUDIO_CODEC", "aac").strip() or "aac"
         self.enable_replay_audio = os.getenv("ENABLE_REPLAY_AUDIO", "true").strip().lower() not in {"0", "false", "no"}
         self.fast_replay_copy = os.getenv("FAST_REPLAY_COPY", "true").strip().lower() not in {"0", "false", "no"}
+        self.replay_story_mode = os.getenv("REPLAY_STORY_MODE", "true").strip().lower() not in {"0", "false", "no"}
+        self.replay_story_width = int(os.getenv("REPLAY_STORY_WIDTH", "720"))
+        self.replay_story_height = int(os.getenv("REPLAY_STORY_HEIGHT", "1280"))
         self.default_replay_seconds = int(os.getenv("DEFAULT_REPLAY_SECONDS", "15"))
         self.segment_time_seconds = int(os.getenv("SEGMENT_TIME_SECONDS", "2"))
         self.segment_wrap_count = int(os.getenv("SEGMENT_WRAP_COUNT", "120"))
@@ -99,7 +102,13 @@ class CaptureServer:
     def run(self) -> None:
         logging.info("Capture-server iniciado para client_id=%s camera_id=%s", self.client_id or "default", self.camera_id)
         self.start_hotkey_listener()
-        self.register_camera()
+        try:
+            self.register_camera()
+        except Exception as exc:
+            # In tenant mode, /cameras can reject IDs that belong to another client context.
+            # Capture must keep running as long as LOCAL_RTSP_URL is available.
+            logging.warning("Falha ao registrar camera no endpoint global /cameras: %s", redact(str(exc)))
+            self.send_log("warning", "Falha ao registrar camera global; seguindo com config local/tenant.")
         self.load_remote_camera_config()
         logging.info("RTSP local configurado: %s", redact(self.local_rtsp_url))
         self.send_log("info", "Capture-server iniciado.")
@@ -234,6 +243,8 @@ class CaptureServer:
             "warning",
             "-rtsp_transport",
             rtsp_transport,
+            "-use_wallclock_as_timestamps",
+            "1",
             "-fflags",
             "+genpts+discardcorrupt",
             "-err_detect",
@@ -416,13 +427,25 @@ class CaptureServer:
         else:
             command.extend(["-an"])
 
-        if self.fast_replay_copy:
+        # Story mode needs video filtering (crop/scale), so stream copy is not possible.
+        if self.fast_replay_copy and not self.replay_story_mode:
             command.extend(["-c:v", "copy"])
         else:
+            if self.replay_story_mode:
+                replay_filter = (
+                    f"trim=duration={seconds},"
+                    "setpts=PTS-STARTPTS,"
+                    "fps=30,"
+                    f"scale=-2:{self.replay_story_height},"
+                    f"crop={self.replay_story_width}:{self.replay_story_height}"
+                )
+            else:
+                replay_filter = f"trim=duration={seconds},setpts=PTS-STARTPTS,fps=30"
+
             command.extend(
                 [
                     "-vf",
-                    f"trim=duration={seconds},setpts=PTS-STARTPTS,fps=30",
+                    replay_filter,
                     "-vsync",
                     "cfr",
                     "-r",

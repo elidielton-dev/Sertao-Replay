@@ -117,9 +117,13 @@ $runningCapture = Get-CaptureProcesses
 if ($runningCapture) {
     Write-Host "[OK] capture-server ja esta rodando."
 } else {
-    Write-Host "[INFO] Iniciando capture-server em nova janela..."
-    $cmd = "cd /d `"$captureDir`" && `".venv\Scripts\python.exe`" capture_server.py"
-    Start-Process -FilePath "cmd.exe" -ArgumentList "/k", $cmd -WorkingDirectory $captureDir
+    Write-Host "[INFO] Iniciando capture-server em segundo plano (sem janela)..."
+    Start-Process -FilePath $capturePython `
+        -ArgumentList $captureScript `
+        -WorkingDirectory $captureDir `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput (Join-Path $captureDir "capture-server.out.log") `
+        -RedirectStandardError (Join-Path $captureDir "capture-server.err.log") | Out-Null
 
     Write-Host "[INFO] Aguardando o buffer da camera iniciar..."
     Start-Sleep -Seconds 8
@@ -131,12 +135,18 @@ if (Test-Path $captureLog) {
     Get-Content $captureLog -Tail 12
 }
 
-Write-Host ""
-Write-Host "[INFO] Abrindo tela do operador:"
-Write-Host $operatorUrl
-Start-Process $operatorUrl
+if ($env:SERTAO_OPEN_BROWSER -eq "1") {
+    Write-Host ""
+    Write-Host "[INFO] Abrindo tela do operador:"
+    Write-Host $operatorUrl
+    Start-Process $operatorUrl
+} else {
+    Write-Host ""
+    Write-Host "[INFO] Navegador nao aberto automaticamente (SERTAO_OPEN_BROWSER != 1)."
+    Write-Host "Acesse manualmente: $operatorUrl"
+}
 
 Write-Host ""
 Write-Host "Sistema iniciado."
-Write-Host "Deixe a janela 'Sertao Replay - capture-server' aberta enquanto usar o replay."
+Write-Host "Capture-server ativo em segundo plano."
 Write-Host ""

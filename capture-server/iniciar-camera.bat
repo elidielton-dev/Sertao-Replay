@@ -19,11 +19,18 @@ if not exist ".env" (
   exit /b 1
 )
 
-echo Iniciando capture-server da camera...
+echo Iniciando capture-server da camera em segundo plano...
 echo.
 
-".venv\Scripts\python.exe" capture_server.py
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "Start-Process -FilePath '%cd%\.venv\Scripts\python.exe' -ArgumentList '%cd%\capture_server.py' -WorkingDirectory '%cd%' -WindowStyle Hidden -RedirectStandardOutput '%cd%\capture-server.out.log' -RedirectStandardError '%cd%\capture-server.err.log'"
 
-echo.
-echo Capture-server encerrado.
-pause
+if errorlevel 1 (
+  echo Falha ao iniciar capture-server em segundo plano.
+  pause
+  exit /b 1
+)
+
+echo [OK] Capture-server iniciado em background.
+echo Logs: %cd%\capture-server.err.log
+timeout /t 2 >nul
