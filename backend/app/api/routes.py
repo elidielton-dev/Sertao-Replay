@@ -111,6 +111,8 @@ def require_operator(
     provided = x_operator_token or request.query_params.get("token")
     if token and provided == token:
         return
+    if settings.super_admin_password and provided == settings.super_admin_password:
+        return
 
     raise HTTPException(status_code=403, detail="Acesso de operador nao autorizado.")
 
@@ -432,11 +434,15 @@ def create_public_client_replay_request(slug: str, payload: ReplayRequest, db: S
 
 @router.post("/super-admin/login")
 def login_super_admin(payload: SuperAdminLoginRequest):
+    email = payload.email.strip().lower()
+    if email == settings.super_admin_email.strip().lower() and payload.password == settings.super_admin_password:
+        return {"ok": True, "operator_token": settings.super_admin_password, "user": {"email": email, "role": "super_admin"}}
+
     if settings.app_env != "production" and not settings.operator_token:
-        return {"ok": True, "operator_token": payload.password, "user": {"email": payload.email.strip().lower(), "role": "super_admin"}}
+        return {"ok": True, "operator_token": payload.password, "user": {"email": email, "role": "super_admin"}}
 
     if settings.operator_token and payload.password == settings.operator_token:
-        return {"ok": True, "operator_token": settings.operator_token, "user": {"email": payload.email.strip().lower(), "role": "super_admin"}}
+        return {"ok": True, "operator_token": settings.operator_token, "user": {"email": email, "role": "super_admin"}}
 
     raise HTTPException(status_code=401, detail="Login do super admin invalido.")
 

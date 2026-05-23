@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./sports_replay.db"
     cors_origins: str = "*"
     operator_token: str | None = None
+    super_admin_email: str = "admin@sertaoreplay.com.br"
+    super_admin_password: str = "@Sertaor2026"
     admin_token_secret: str | None = None
     default_client_id: str = "mvp"
 
