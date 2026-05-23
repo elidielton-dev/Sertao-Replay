@@ -4265,7 +4265,7 @@ function StreamingPageLite({ clientSlug = "" }) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STREAM_CHAT_STORAGE_KEY, JSON.stringify(chatMessages.slice(-80)));
+      window.localStorage.setItem(STREAM_CHAT_STORAGE_KEY, JSON.stringify(chatMessages.slice(-40)));
     } catch {
       // localStorage can be unavailable.
     }
@@ -4293,7 +4293,8 @@ function StreamingPageLite({ clientSlug = "" }) {
         const clientQuery = clientSlug ? `&client_slug=${encodeURIComponent(clientSlug)}` : "";
         const data = await apiRequest(`/chat/messages?camera_id=${encodeURIComponent(selectedCamera.id)}&limit=80${clientQuery}`);
         if (!cancelled && Array.isArray(data)) {
-          setChatMessages(data.map(normalizeChatMessage));
+          // Keep only the most recent messages, like live chats.
+          setChatMessages(data.map(normalizeChatMessage).slice(-40));
         }
       } catch {
         if (!cancelled) {
@@ -4328,8 +4329,8 @@ function StreamingPageLite({ clientSlug = "" }) {
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
       const seekToStableDelay = () => {
-        if (Number.isFinite(video.duration) && video.duration > 6) {
-          video.currentTime = Math.max(0, video.duration - 5);
+        if (Number.isFinite(video.duration) && video.duration > 14) {
+          video.currentTime = Math.max(0, video.duration - 12);
         }
       };
       video.addEventListener("loadedmetadata", seekToStableDelay, { once: true });
@@ -4344,12 +4345,12 @@ function StreamingPageLite({ clientSlug = "" }) {
     }
 
     const hls = new Hls({
-      lowLatencyMode: true,
-      backBufferLength: 45,
-      maxBufferLength: 12,
-      liveSyncDuration: 5,
-      liveMaxLatencyDuration: 10,
-      maxLiveSyncPlaybackRate: 1.2,
+      lowLatencyMode: false,
+      backBufferLength: 90,
+      maxBufferLength: 30,
+      liveSyncDuration: 12,
+      liveMaxLatencyDuration: 20,
+      maxLiveSyncPlaybackRate: 1.05,
       enableWorker: true,
     });
     hlsRef.current = hls;
@@ -4432,9 +4433,9 @@ function StreamingPageLite({ clientSlug = "" }) {
                     text,
                   }),
                 });
-                setChatMessages((current) => [...current.slice(-79), normalizeChatMessage(saved)]);
+                setChatMessages((current) => [...current.slice(-39), normalizeChatMessage(saved)]);
               } catch {
-                setChatMessages((current) => [...current.slice(-79), fallbackMessage]);
+                setChatMessages((current) => [...current.slice(-39), fallbackMessage]);
               }
             }}
             setChatDraft={setChatDraft}
