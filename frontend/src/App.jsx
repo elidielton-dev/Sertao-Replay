@@ -3157,9 +3157,6 @@ function SuperAdminPage() {
     admin_email: "",
     admin_password: "",
     is_active: true,
-    initial_field_name: "",
-    initial_camera_number: "1",
-    initial_camera_ip: "",
   });
 
   const activeClients = clients.filter((client) => client.is_active).length;
@@ -3284,9 +3281,6 @@ function SuperAdminPage() {
       admin_email: "",
       admin_password: "",
       is_active: true,
-      initial_field_name: "",
-      initial_camera_number: "1",
-      initial_camera_ip: "",
     });
     setCep("");
     setCepStatus("");
@@ -3637,15 +3631,6 @@ function SuperAdminPage() {
                 <label>Nome do admin<input value={form.admin_name} onChange={(event) => updateForm("admin_name", event.target.value)} required /></label>
                 <label>Usuario do cliente<input value={form.admin_email} onChange={(event) => updateForm("admin_email", event.target.value)} placeholder="email de login" type="email" required /></label>
                 <label>Senha do cliente<input value={form.admin_password} onChange={(event) => updateForm("admin_password", event.target.value)} placeholder="senha inicial" type="text" required /></label>
-              </div>
-              <div className="super-admin-form-section">
-                <strong>Campo inicial do cliente</strong>
-                <span>Cria o primeiro campo e a camera que aparecera na Home do atleta.</span>
-              </div>
-              <div className="super-admin-form-grid">
-                <label>Nome do campo<input value={form.initial_field_name} onChange={(event) => updateForm("initial_field_name", event.target.value)} placeholder="Ex: Campo principal" /></label>
-                <label>Qual camera<select value={form.initial_camera_number} onChange={(event) => updateForm("initial_camera_number", event.target.value)}><option value="1">Camera 1</option><option value="2">Camera 2</option><option value="3">Camera 3</option><option value="4">Camera 4</option></select></label>
-                <label className="is-wide">IP ou RTSP da camera<input value={form.initial_camera_ip} onChange={(event) => updateForm("initial_camera_ip", event.target.value)} placeholder="10.0.0.142:8554 ou rtsp://10.0.0.142:8554/camera" /></label>
               </div>
               <div className="super-admin-form-footer">
                 <label className="super-admin-check"><input checked={form.is_active} onChange={(event) => updateForm("is_active", event.target.checked)} type="checkbox" /> Cliente ativo</label>
