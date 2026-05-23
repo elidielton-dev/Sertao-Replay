@@ -4199,21 +4199,27 @@ function StreamingPageLite({ clientSlug = "" }) {
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("Carregando live...");
   const [selectedCamera, setSelectedCamera] = useState(null);
+  const [replays, setReplays] = useState([]);
+  const [previewReplayId, setPreviewReplayId] = useState("");
   const [chatMessages, setChatMessages] = useState(() => loadStoredChatMessages());
   const [chatDraft, setChatDraft] = useState("");
   const [chatUserName, setChatUserName] = useState(() => loadStoredChatUser(clientSlug) || STREAM_CHAT_USER);
   const [chatNameDraft, setChatNameDraft] = useState(() => loadStoredChatUser(clientSlug) || STREAM_CHAT_USER);
-  const [showChatNameModal, setShowChatNameModal] = useState(false);
+  const [showChatNameModal, setShowChatNameModal] = useState(() => !loadStoredChatUser(clientSlug));
 
   useEffect(() => {
     let mounted = true;
     async function load() {
       try {
-        const cameraData = await apiRequest(clientApiPath(clientSlug, "/cameras"), { timeoutMs: 10000 });
+        const [cameraData, replayData] = await Promise.all([
+          apiRequest(clientApiPath(clientSlug, "/cameras"), { timeoutMs: 10000 }),
+          apiRequest(clientApiPath(clientSlug, "/replays"), { timeoutMs: 10000 }),
+        ]);
         const enabled = Array.isArray(cameraData) ? cameraData.filter((camera) => camera.enabled !== false) : [];
         const camera = enabled.find((item) => item.status === "recording") || enabled[0] || null;
         if (!mounted) return;
         setSelectedCamera(camera);
+        setReplays(Array.isArray(replayData) ? replayData : []);
         if (!camera) {
           setStatus("error");
           setMessage("Nenhuma camera ativa para este cliente.");
@@ -4243,10 +4249,11 @@ function StreamingPageLite({ clientSlug = "" }) {
   }
 
   useEffect(() => {
-    const storedUser = loadStoredChatUser(clientSlug) || STREAM_CHAT_USER;
-    setChatUserName(storedUser);
-    setChatNameDraft(storedUser);
-    setShowChatNameModal(false);
+    const storedUser = loadStoredChatUser(clientSlug);
+    const safeUser = storedUser || STREAM_CHAT_USER;
+    setChatUserName(safeUser);
+    setChatNameDraft(safeUser);
+    setShowChatNameModal(!storedUser);
   }, [clientSlug]);
 
   useEffect(() => {
@@ -4363,6 +4370,12 @@ function StreamingPageLite({ clientSlug = "" }) {
     };
   }, [selectedCamera]);
 
+  const posterImage = cameraTemplate(parseCameraIdentity(selectedCamera)?.cameraId || 1).image;
+  const cameraReplays = selectedCamera
+    ? replays.filter((replay) => replay.status === "ready" && replay.camera_id === selectedCamera.id && replay.video_url).slice(0, 6)
+    : [];
+  const previewReplay = cameraReplays.find((replay) => String(replay.id) === previewReplayId) || null;
+
   return (
     <main className="min-h-screen bg-black px-3 pb-8 pt-20 text-white sm:px-4 md:px-8">
       <nav className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-[#8ddc00]/30 bg-[#101413]/95 px-4">
@@ -4422,6 +4435,28 @@ function StreamingPageLite({ clientSlug = "" }) {
             onChangeUser={() => setShowChatNameModal(true)}
           />
         </div>
+
+        <section className="mt-6 space-y-4">
+          <h2 className="text-2xl font-black text-white">Highlights recentes</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {cameraReplays.map((replay) => (
+              <button
+                className="group min-h-0 rounded-xl border-0 bg-transparent p-0 text-left text-white transition"
+                key={replay.id}
+                onClick={() => setPreviewReplayId(String(replay.id))}
+                type="button"
+              >
+                <div className="relative mb-2 aspect-video overflow-hidden rounded-xl bg-[#0b0f0e]">
+                  <img alt={replayTitle(replay)} className="h-full w-full object-cover opacity-70 transition duration-500 group-hover:scale-105" src={posterImage} />
+                  <span className="absolute bottom-2 right-2 rounded bg-black/80 px-2 py-1 text-xs text-white">{replayDurationLabel(replay.duration)}</span>
+                </div>
+                <h3 className="mb-1 line-clamp-2 font-bold transition group-hover:text-[#a1fb00]">{replayTitle(replay)}</h3>
+                <p className="m-0 text-sm text-[#c0caad]">{formatDate(replay.created_at)}</p>
+              </button>
+            ))}
+            {!cameraReplays.length ? <div className="rounded-xl border border-[#414a34] bg-[#181c1b] p-5 text-sm text-[#c0caad]">Nenhum highlight desta camera ainda.</div> : null}
+          </div>
+        </section>
       </section>
 
       {showChatNameModal ? (
@@ -4448,6 +4483,25 @@ function StreamingPageLite({ clientSlug = "" }) {
               Salvar nome
             </button>
           </form>
+        </div>
+      ) : null}
+
+      {previewReplay ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onClick={() => setPreviewReplayId("")}>
+          <section className="w-full max-w-4xl overflow-hidden rounded-2xl border border-[#8ddc00]/30 bg-[#101413]" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 border-b border-[#8ddc00]/20 p-4">
+              <div className="min-w-0">
+                <h2 className="m-0 line-clamp-2 text-lg font-black text-white sm:text-2xl">{replayTitle(previewReplay)}</h2>
+                <p className="m-0 text-sm text-[#c0caad]">{formatDate(previewReplay.created_at)}</p>
+              </div>
+              <button className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#414a34] text-[#c0caad]" onClick={() => setPreviewReplayId("")} type="button">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4">
+              <video autoPlay controls className="aspect-video w-full rounded-xl bg-black object-contain" src={mediaUrl(previewReplay.video_url)} />
+            </div>
+          </section>
         </div>
       ) : null}
     </main>
