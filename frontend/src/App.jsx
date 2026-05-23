@@ -1660,7 +1660,7 @@ function StreamingChatPanel({ chatDraft, chatListRef, chatMessages, handleSendCh
             {userName || STREAM_CHAT_USER}
           </button>
         </div>
-        <div className="flex-1 space-y-4 overflow-y-hidden p-4" ref={chatListRef}>
+        <div className="h-[290px] space-y-4 overflow-y-auto p-4" ref={chatListRef}>
           {!chatMessages.length ? (
             <div className="rounded-xl border border-[#414a34] bg-[#181c1b] p-4 text-sm text-[#c0caad]">
               Seja o primeiro a comentar nessa live.
@@ -4383,7 +4383,6 @@ function StreamingPageLite({ clientSlug = "" }) {
     ? replays.filter((replay) => replay.status === "ready" && replay.camera_id === selectedCamera.id && replay.video_url).slice(0, 6)
     : [];
   const previewReplay = cameraReplays.find((replay) => String(replay.id) === previewReplayId) || null;
-  const recentChatMessages = chatMessages.slice(-5);
 
   return (
     <main className="min-h-screen bg-black px-3 pb-8 pt-20 text-white sm:px-4 md:px-8">
@@ -4400,13 +4399,13 @@ function StreamingPageLite({ clientSlug = "" }) {
         <div className="mb-3 text-sm text-[#c0caad]">{message}</div>
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="overflow-hidden rounded-xl border border-[#8ddc00]/25 bg-black">
-            <video ref={videoRef} autoPlay controls muted playsInline className="aspect-video w-full bg-black object-cover object-center" />
+            <video ref={videoRef} autoPlay controls muted playsInline className="aspect-video w-full bg-black object-contain" />
           </div>
 
           <StreamingChatPanel
             chatDraft={chatDraft}
             chatListRef={chatListRef}
-            chatMessages={recentChatMessages}
+            chatMessages={chatMessages}
             handleSendChat={async (event) => {
               event.preventDefault();
               const text = chatDraft.trim();
