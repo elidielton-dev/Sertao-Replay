@@ -4265,7 +4265,7 @@ function StreamingPageLite({ clientSlug = "" }) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STREAM_CHAT_STORAGE_KEY, JSON.stringify(chatMessages.slice(-40)));
+      window.localStorage.setItem(STREAM_CHAT_STORAGE_KEY, JSON.stringify(chatMessages.slice(-4)));
     } catch {
       // localStorage can be unavailable.
     }
@@ -4294,7 +4294,7 @@ function StreamingPageLite({ clientSlug = "" }) {
         const data = await apiRequest(`/chat/messages?camera_id=${encodeURIComponent(selectedCamera.id)}&limit=80${clientQuery}`);
         if (!cancelled && Array.isArray(data)) {
           // Keep only the most recent messages, like live chats.
-          setChatMessages(data.map(normalizeChatMessage).slice(-40));
+          setChatMessages(data.map(normalizeChatMessage).slice(-4));
         }
       } catch {
         if (!cancelled) {
@@ -4397,7 +4397,7 @@ function StreamingPageLite({ clientSlug = "" }) {
 
       <section className="mx-auto w-full max-w-6xl">
         <div className="mb-3 text-sm text-[#c0caad]">{message}</div>
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="overflow-hidden rounded-xl border border-[#8ddc00]/25 bg-black">
             <video ref={videoRef} autoPlay controls muted playsInline className="aspect-video w-full bg-black object-contain" />
           </div>
@@ -4405,7 +4405,7 @@ function StreamingPageLite({ clientSlug = "" }) {
           <StreamingChatPanel
             chatDraft={chatDraft}
             chatListRef={chatListRef}
-            chatMessages={chatMessages}
+            chatMessages={chatMessages.slice(-4)}
             handleSendChat={async (event) => {
               event.preventDefault();
               const text = chatDraft.trim();
@@ -4433,15 +4433,15 @@ function StreamingPageLite({ clientSlug = "" }) {
                     text,
                   }),
                 });
-                setChatMessages((current) => [...current.slice(-39), normalizeChatMessage(saved)]);
+                setChatMessages((current) => [...current.slice(-3), normalizeChatMessage(saved)]);
               } catch {
-                setChatMessages((current) => [...current.slice(-39), fallbackMessage]);
+                setChatMessages((current) => [...current.slice(-3), fallbackMessage]);
               }
             }}
             setChatDraft={setChatDraft}
             userName={chatUserName}
             onChangeUser={() => setShowChatNameModal(true)}
-            className="lg:sticky lg:top-24 lg:h-[calc(100vh-120px)]"
+            className="lg:sticky lg:top-24 lg:h-[400px]"
           />
         </div>
 
