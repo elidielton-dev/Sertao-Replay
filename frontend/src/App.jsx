@@ -2009,14 +2009,22 @@ function StreamingPage({ clientSlug = "" }) {
           return;
         }
 
-        const response = await fetch(effectiveWebrtcUrl, {
-          method: "POST",
-          headers: {
-            Accept: "application/sdp",
-            "Content-Type": "application/sdp",
-          },
-          body: peerConnection.localDescription?.sdp || offer.sdp,
-        });
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+        let response;
+        try {
+          response = await fetch(effectiveWebrtcUrl, {
+            method: "POST",
+            headers: {
+              Accept: "application/sdp",
+              "Content-Type": "application/sdp",
+            },
+            body: peerConnection.localDescription?.sdp || offer.sdp,
+            signal: controller.signal,
+          });
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
 
         if (!response.ok) {
           throw new Error(`Gateway WebRTC respondeu ${response.status}.`);
