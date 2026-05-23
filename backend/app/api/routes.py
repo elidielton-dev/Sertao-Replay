@@ -459,8 +459,8 @@ def resolve_install_key(payload: InstallResolveRequest, db: Session = Depends(ge
             "slug": client.slug,
             "plan": client.plan,
             "admin_email": admin.email if admin else None,
-            "public_url": f"https://sertaoreplay.vercel.app/{client.slug}",
-            "admin_url": f"https://sertaoreplay.vercel.app/admin/{client.slug}/dashboard",
+            "public_url": f"https://sports-replay-mvp.vercel.app/{client.slug}",
+            "admin_url": f"https://sports-replay-mvp.vercel.app/admin/{client.slug}/dashboard",
         },
         "cameras": [
             {
@@ -478,7 +478,7 @@ def resolve_install_key(payload: InstallResolveRequest, db: Session = Depends(ge
             "client_slug": client.slug,
             "camera_id": first_camera.id if first_camera else f"{client.slug}-campo-01"[:64],
             "camera_name": first_camera.name if first_camera else "Campo 01",
-            "operator_url": f"https://sertaoreplay.vercel.app/{client.slug}",
+            "operator_url": f"https://sports-replay-mvp.vercel.app/{client.slug}",
         },
     }
 
