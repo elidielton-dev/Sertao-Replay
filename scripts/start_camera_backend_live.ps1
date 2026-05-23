@@ -7,7 +7,7 @@ param(
     [string]$CameraSourceTransport = "",
     [string]$PublicWebrtcHost = "",
     [string]$LocalIp = "",
-    [string]$FrontendStreamingUrl = "https://sports-replay-mvp.vercel.app/streaming",
+    [string]$FrontendStreamingUrl = "https://sertaoreplay.vercel.app/streaming",
     [switch]$NoFirewall,
     [switch]$NoUpnp,
     [switch]$StopOnly

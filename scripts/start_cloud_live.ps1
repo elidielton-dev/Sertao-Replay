@@ -195,7 +195,7 @@ $envValues["CAMERA_SOURCE_RTSP_URL"] = $cameraSourceRtspUrl
 $envValues["CAMERA_SOURCE_RTSP_TRANSPORT"] = $cameraSourceTransport
 $envValues["LOCAL_RTSP_URL"] = $CloudRtspUrl
 $envValues["RTSP_TRANSPORT"] = "tcp"
-$envValues["OPERATOR_URL"] = "https://sports-replay-mvp.vercel.app/operador"
+$envValues["OPERATOR_URL"] = "https://sertaoreplay.vercel.app/operador"
 Save-DotEnv $captureEnv $envValues
 
 Write-Step "Publicando camera no servidor publico"
@@ -288,7 +288,7 @@ try {
 Write-Host ""
 Write-Host "============================================================"
 Write-Host "LIVE CLOUD INICIADA"
-Write-Host "Site:       https://sports-replay-mvp.vercel.app/streaming"
+Write-Host "Site:       https://sertaoreplay.vercel.app/streaming"
 Write-Host "RTSP cloud: $CloudRtspUrl"
 Write-Host "HLS proxy:  $BackendApiUrl/cameras/$CameraId/hls/index.m3u8"
 Write-Host "Logs:"

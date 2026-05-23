@@ -11,9 +11,9 @@ O ponto mais importante: o operador nao grava o video diretamente. Ele cria uma 
 ## Links principais
 
 ```text
-Home publica:      https://sports-replay-mvp.vercel.app/
-Tela do operador: https://sports-replay-mvp.vercel.app/operador
-Painel admin:     https://sports-replay-mvp.vercel.app/admin
+Home publica:      https://sertaoreplay.vercel.app/
+Tela do operador: https://sertaoreplay.vercel.app/operador
+Painel admin:     https://sertaoreplay.vercel.app/admin
 Backend API:      https://sertao-replay.onrender.com/api
 Health check:     https://sertao-replay.onrender.com/api/health
 ```
@@ -67,7 +67,7 @@ BACKEND_API_URL=https://sertao-replay.onrender.com/api
 OPERATOR_TOKEN=cole_o_token_aqui
 CAMERA_ID=campo-01
 LOCAL_RTSP_URL=rtsp://usuario:senha@192.168.0.6:554/onvif1
-OPERATOR_URL=https://sports-replay-mvp.vercel.app/operador
+OPERATOR_URL=https://sertaoreplay.vercel.app/operador
 RTSP_TRANSPORT=tcp
 BUFFER_VIDEO_CODEC=libx264
 BUFFER_FPS=30
@@ -83,7 +83,7 @@ POLL_INTERVAL_SECONDS=1
 
 ## Como adicionar camera
 
-1. Abra `https://sports-replay-mvp.vercel.app/admin`.
+1. Abra `https://sertaoreplay.vercel.app/admin`.
 2. Informe o token de operador e clique em `Salvar token`.
 3. Preencha o formulario da camera:
    - `ID`: exemplo `campo-01`;
@@ -137,7 +137,7 @@ Variaveis recomendadas:
 ```env
 APP_ENV=production
 DATABASE_URL=postgresql://...
-CORS_ORIGINS=https://sports-replay-mvp.vercel.app
+CORS_ORIGINS=https://sertaoreplay.vercel.app
 OPERATOR_TOKEN=token_seguro
 REPLAY_ROOT=./storage/replays
 LOG_ROOT=./storage/logs

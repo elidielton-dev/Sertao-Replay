@@ -1,7 +1,7 @@
 param(
   [string]$VideoPath = "C:\Users\elidi\Downloads\Ronaldinho Was Truly Unstoppable in His Prime! - ArtSoccer (720p, h264, youtube).mp4",
   [string]$ApiUrl = "https://sertao-replay.onrender.com/api",
-  [string]$FrontendUrl = "https://sports-replay-mvp.vercel.app",
+  [string]$FrontendUrl = "https://sertaoreplay.vercel.app",
   [string]$OperatorToken = "sertao_replay_operador_2026",
   [string]$ClientSlug = "demo-ronaldinho",
   [string]$ClientName = "Demo Ronaldinho",

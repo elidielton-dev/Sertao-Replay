@@ -245,7 +245,7 @@ Start-Sleep -Seconds 8
 
 Write-Host ""
 Write-Host "[OK] Gateway local da camera iniciado."
-Write-Host "Site no ar:     https://sports-replay-mvp.vercel.app/streaming"
+Write-Host "Site no ar:     https://sertaoreplay.vercel.app/streaming"
 Write-Host "Backend no ar:  $backendApiUrl"
 Write-Host "WHEP local:     http://127.0.0.1:8889/$liveRtspPath/whep"
 Write-Host "WHEP publico:   http://${publicIp}:8889/$liveRtspPath/whep"

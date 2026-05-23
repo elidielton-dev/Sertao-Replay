@@ -7,7 +7,7 @@ $captureScript = Join-Path $captureDir "capture_server.py"
 $capturePython = Join-Path $captureDir ".venv\Scripts\python.exe"
 $captureRequirements = Join-Path $captureDir "requirements.txt"
 $captureLog = Join-Path $captureDir "capture-server.err.log"
-$defaultOperatorUrl = "https://sports-replay-mvp.vercel.app/operador"
+$defaultOperatorUrl = "https://sertaoreplay.vercel.app/operador"
 
 function Write-Section($text) {
     Write-Host ""

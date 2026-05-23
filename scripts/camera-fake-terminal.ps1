@@ -2,7 +2,16 @@ param(
   [string]$MachineIp = "",
   [string]$VideoPath = "",
   [string]$RtspPath = "ronaldinho-demo",
-  [int]$RtspPort = 8554
+  [int]$RtspPort = 8554,
+  [string]$ApiUrl = "https://sertao-replay.onrender.com/api",
+  [string]$FrontendUrl = "https://sertaoreplay.vercel.app",
+  [string]$OperatorToken = "sertao_replay_operador_2026",
+  [string]$ClientSlug = "teste-local",
+  [string]$ClientName = "Teste Local",
+  [string]$AdminEmail = "admin@teste-local.test",
+  [string]$AdminPassword = "TesteLocal@2026",
+  [string]$FieldName = "Campo Teste Local",
+  [string]$CameraId = "campo-01-camera-01"
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,6 +23,7 @@ $pidPath = Join-Path $appDir "camera-fake-pids.json"
 $mediamtxDir = Join-Path $toolsDir "mediamtx"
 $mediamtxExe = Join-Path $mediamtxDir "mediamtx.exe"
 $mediamtxConfig = Join-Path $appDir "mediamtx.yml"
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 function Write-Step([string]$Message) {
   Write-Host ""
@@ -45,6 +55,36 @@ function Stop-PreviousFakeCamera {
   }
 
   Remove-Item -LiteralPath $pidPath -Force -ErrorAction SilentlyContinue
+}
+
+function Invoke-ApiJson {
+  param(
+    [string]$Method,
+    [string]$Path,
+    [object]$Body = $null,
+    [hashtable]$Headers = @{}
+  )
+
+  $finalHeaders = @{}
+  if ($OperatorToken) {
+    $finalHeaders["X-Operator-Token"] = $OperatorToken
+  }
+  foreach ($key in $Headers.Keys) {
+    $finalHeaders[$key] = $Headers[$key]
+  }
+
+  $parameters = @{
+    Method = $Method
+    Uri = "$($ApiUrl.TrimEnd('/'))$Path"
+    Headers = $finalHeaders
+    TimeoutSec = 60
+  }
+  if ($null -ne $Body) {
+    $parameters.ContentType = "application/json"
+    $parameters.Body = ($Body | ConvertTo-Json -Depth 8)
+  }
+
+  Invoke-RestMethod @parameters
 }
 
 function Get-DefaultIPv4 {
@@ -170,12 +210,40 @@ function Ask-Required([string]$CurrentValue, [string]$Prompt, [string]$DefaultVa
   return $value
 }
 
+function Resolve-VideoPath([string]$CurrentValue) {
+  if ($CurrentValue) {
+    return [System.IO.Path]::GetFullPath($CurrentValue.Trim('"'))
+  }
+
+  $candidate = Get-ChildItem -Path $scriptDir -Filter *.mp4 -File -ErrorAction SilentlyContinue | Select-Object -First 1
+  if (!$candidate) {
+    $candidate = Get-ChildItem -Path (Join-Path $env:USERPROFILE "Downloads") -Filter *.mp4 -File -ErrorAction SilentlyContinue |
+      Sort-Object LastWriteTime -Descending |
+      Select-Object -First 1
+  }
+
+  $default = if ($candidate) { $candidate.FullName } else { "" }
+  return [System.IO.Path]::GetFullPath((Ask-Required "" "Digite o caminho completo do video MP4" $default).Trim('"'))
+}
+
+function Get-AvailableRtspPort([int]$PreferredPort) {
+  $ports = @($PreferredPort, 8554, 8555, 8556, 10554) | Select-Object -Unique
+  foreach ($port in $ports) {
+    $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (!$listener) {
+      return $port
+    }
+    Write-Warn "Porta $port ja esta em uso. Testando proxima porta."
+  }
+
+  return $PreferredPort
+}
+
 New-Item -ItemType Directory -Force -Path $appDir, $toolsDir, $logDir | Out-Null
 
 $defaultIp = Get-DefaultIPv4
 $MachineIp = Ask-Required $MachineIp "Digite o IP da maquina que vai aparecer na rede" $defaultIp
-$VideoPath = Ask-Required $VideoPath "Digite o caminho completo do video MP4"
-$VideoPath = [System.IO.Path]::GetFullPath($VideoPath.Trim('"'))
+$VideoPath = Resolve-VideoPath $VideoPath
 $RtspPath = ($RtspPath -replace "[^A-Za-z0-9_-]", "").Trim()
 if (!$RtspPath) {
   $RtspPath = "ronaldinho-demo"
@@ -190,6 +258,7 @@ Stop-PreviousFakeCamera
 $ffmpegExe = Ensure-Ffmpeg
 $ffprobeExe = Get-FfprobePath $ffmpegExe
 $mediamtxExe = Ensure-MediaMtx
+$RtspPort = Get-AvailableRtspPort $RtspPort
 
 @"
 logLevel: info
@@ -244,12 +313,58 @@ if ($MachineIp -ne "127.0.0.1") {
   Test-RtspUrl $ffprobeExe $networkRtspUrl
 }
 
+Write-Step "Criando perfil e camera no Sertao Replay"
+try {
+  $clients = Invoke-ApiJson -Method "GET" -Path "/super-admin/clients"
+  $client = $clients | Where-Object { $_.slug -eq $ClientSlug } | Select-Object -First 1
+  if (!$client) {
+    $client = Invoke-ApiJson -Method "POST" -Path "/super-admin/clients" -Body @{
+      name = $ClientName
+      slug = $ClientSlug
+      plan = "demo"
+      logo_url = "/assets/logo-sertao-replay-nav.png"
+      company_email = $AdminEmail
+      company_phone = ""
+      document = "DEMO"
+      address = "Camera fake local"
+      admin_name = "Admin Teste Local"
+      admin_email = $AdminEmail
+      admin_password = $AdminPassword
+      is_active = $true
+    }
+  } else {
+    $client = Invoke-ApiJson -Method "PATCH" -Path "/super-admin/clients/$($client.id)" -Body @{
+      name = $ClientName
+      is_active = $true
+      admin_name = "Admin Teste Local"
+      admin_email = $AdminEmail
+      admin_password = $AdminPassword
+    }
+  }
+
+  $camera = Invoke-ApiJson -Method "POST" -Path "/cameras" -Headers @{ "X-Client-Slug" = $ClientSlug } -Body @{
+    id = $CameraId
+    name = "$FieldName - Camera 1"
+    slug = $CameraId
+    rtsp_url = $networkRtspUrl
+    enabled = $true
+    notes = "Camera fake validada pelo apresentador local."
+  }
+  Write-Ok "Perfil $ClientName pronto."
+  Write-Ok "Camera cadastrada: $($camera.id) -> $($camera.rtsp_url)"
+} catch {
+  Write-Warn "Nao consegui criar o perfil/camera automaticamente: $($_.Exception.Message)"
+  Write-Warn "A camera fake continua rodando. Cadastre manualmente com a URL $networkRtspUrl."
+}
+
 @{
   mediamtx = $mediamtx.Id
   ffmpeg = $ffmpeg.Id
   machine_ip = $MachineIp
   rtsp_url = $networkRtspUrl
   local_rtsp_url = $localRtspUrl
+  client_slug = $ClientSlug
+  camera_id = $CameraId
   video_path = $VideoPath
   started_at = (Get-Date).ToString("s")
 } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $pidPath -Encoding UTF8
@@ -266,6 +381,13 @@ Write-Host "$MachineIp`:$RtspPort" -ForegroundColor White
 Write-Host ""
 Write-Host "Se o cadastro por IP nao detectar o caminho, use a URL completa:" -ForegroundColor Cyan
 Write-Host $networkRtspUrl -ForegroundColor White
+Write-Host ""
+Write-Host "Perfil criado para apresentacao:" -ForegroundColor Cyan
+Write-Host "$FrontendUrl/$ClientSlug" -ForegroundColor White
+Write-Host "$FrontendUrl/$ClientSlug/campo1" -ForegroundColor White
+Write-Host "$FrontendUrl/admin/$ClientSlug/dashboard" -ForegroundColor White
+Write-Host "Admin: $AdminEmail" -ForegroundColor White
+Write-Host "Senha: $AdminPassword" -ForegroundColor White
 Write-Host ""
 Write-Host "Logs e estado ficam em: $appDir"
 Write-Host "Para parar: feche esta janela ou rode camera-fake-stop.ps1."
