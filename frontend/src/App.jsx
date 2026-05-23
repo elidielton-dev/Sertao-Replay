@@ -17,6 +17,8 @@
   LogIn,
   Menu,
   Plus,
+  Power,
+  Radio,
   RotateCcw,
   Save,
   Send,
@@ -2914,6 +2916,55 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
     }
   }
 
+  async function toggleTenantLive(enableLive) {
+    if (!token) {
+      setMessage("Login admin obrigatorio.");
+      return;
+    }
+
+    const cameraId = cameraForm.id.trim();
+    const cameraName = cameraForm.name.trim();
+    const cameraIp = cameraForm.camera_ip.trim();
+    const liveTitle = cameraForm.live_title.trim();
+    const liveDescription = cameraForm.live_description.trim();
+
+    if (!cameraId || !cameraName || !cameraIp) {
+      setMessage("Selecione uma camera cadastrada para controlar a live.");
+      return;
+    }
+
+    if (enableLive && (!liveTitle || !liveDescription)) {
+      setMessage("Preencha titulo e descricao antes de ligar a live.");
+      return;
+    }
+
+    const payload = {
+      id: cameraId,
+      name: cameraName,
+      camera_ip: cameraIp,
+      live_enabled: enableLive,
+      live_title: liveTitle || null,
+      live_description: liveDescription || null,
+    };
+
+    setBusy(true);
+    setMessage(enableLive ? "Ligando live..." : "Desligando live...");
+    try {
+      await apiRequest("/admin/cameras", {
+        method: "POST",
+        bearerToken: token,
+        body: JSON.stringify(payload),
+      });
+      setMessage(enableLive ? "Live ligada com sucesso." : "Live desligada com sucesso.");
+      setCameraForm((current) => ({ ...current, live_enabled: enableLive }));
+      await reloadAdminData();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const navItems = [
     { href: `${adminBase}/dashboard`, label: "Inicio", icon: Home, key: "dashboard" },
   ];
@@ -3145,15 +3196,46 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
                   required
                 />
 
-                <label className="tenant-admin-toggle" htmlFor="tenantCameraLiveEnabled">
-                  <input
-                    id="tenantCameraLiveEnabled"
-                    type="checkbox"
-                    checked={cameraForm.live_enabled}
-                    onChange={(event) => updateCameraForm("live_enabled", event.target.checked)}
-                  />
-                  Live online neste camera
-                </label>
+                <div className="tenant-admin-form-actions">
+                  <button className="tenant-admin-primary" type="submit" disabled={busy}>{busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />} Salvar camera</button>
+                </div>
+              </form>
+            </article>
+
+            <article className="tenant-admin-card tenant-admin-form-card">
+              <div className="tenant-admin-section-head">
+                <div>
+                  <h2>Controle da live</h2>
+                  <p>Preencha titulo e descricao e clique em Ligar live. Para parar, clique em Desligar live.</p>
+                </div>
+              </div>
+              <form className="tenant-admin-form" onSubmit={(event) => event.preventDefault()}>
+                <label htmlFor="tenantLiveCameraId">ID da camera da live</label>
+                <input
+                  id="tenantLiveCameraId"
+                  value={cameraForm.id}
+                  onChange={(event) => updateCameraForm("id", event.target.value)}
+                  placeholder="campo-01-camera-01"
+                  required
+                />
+
+                <label htmlFor="tenantLiveCameraName">Nome da camera</label>
+                <input
+                  id="tenantLiveCameraName"
+                  value={cameraForm.name}
+                  onChange={(event) => updateCameraForm("name", event.target.value)}
+                  placeholder="Campo 1 - Camera 1"
+                  required
+                />
+
+                <label htmlFor="tenantLiveCameraIp">RTSP da camera</label>
+                <input
+                  id="tenantLiveCameraIp"
+                  value={cameraForm.camera_ip}
+                  onChange={(event) => updateCameraForm("camera_ip", event.target.value)}
+                  placeholder="rtsp://10.0.0.142:8554/live"
+                  required
+                />
 
                 <label htmlFor="tenantCameraLiveTitle">Titulo da live</label>
                 <input
@@ -3161,6 +3243,7 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
                   value={cameraForm.live_title}
                   onChange={(event) => updateCameraForm("live_title", event.target.value)}
                   placeholder="Ex: Final do Campeonato - Campo 1"
+                  required
                 />
 
                 <label htmlFor="tenantCameraLiveDescription">Descricao da live</label>
@@ -3170,10 +3253,16 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
                   onChange={(event) => updateCameraForm("live_description", event.target.value)}
                   placeholder="Informacoes da transmissao para o publico."
                   rows={3}
+                  required
                 />
 
                 <div className="tenant-admin-form-actions">
-                  <button className="tenant-admin-primary" type="submit" disabled={busy}>{busy ? <Loader2 className="spin" size={18} /> : <Save size={18} />} Salvar camera</button>
+                  <button className="tenant-admin-primary" type="button" disabled={busy} onClick={() => toggleTenantLive(true)}>
+                    {busy ? <Loader2 className="spin" size={18} /> : <Radio size={18} />} Ligar live
+                  </button>
+                  <button className="tenant-admin-secondary" type="button" disabled={busy} onClick={() => toggleTenantLive(false)}>
+                    <Power size={18} /> Desligar live
+                  </button>
                 </div>
               </form>
             </article>
