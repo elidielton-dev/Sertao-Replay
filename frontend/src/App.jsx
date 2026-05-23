@@ -2708,6 +2708,7 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
     camera_id: "",
     camera_ip: "",
   });
+  const [liveCameraId, setLiveCameraId] = useState("");
 
   const token = session?.access_token;
   const client = settingsData || session?.client;
@@ -2719,6 +2720,7 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
   const publicReplays = replays.filter((replay) => replay.is_public).length;
   const recentReplays = replays.slice(0, 8);
   const chartValues = [40, 30, 55, 80, 95, 70, 45, 35, 60, 50, 85, 75];
+  const selectedLiveCamera = cameras.find((camera) => camera.id === liveCameraId) || null;
 
   useEffect(() => {
     if (!token) {
@@ -2743,6 +2745,10 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
         setCameras(Array.isArray(cameraData) ? cameraData : []);
         setReplays(Array.isArray(replayData) ? replayData : []);
         setSettingsData(settingsResult);
+        const available = Array.isArray(cameraData) ? cameraData : [];
+        if (available.length && !liveCameraId) {
+          setLiveCameraId(available[0].id);
+        }
         setMessage("Dados carregados.");
       } catch (error) {
         setMessage(error.message);
@@ -2754,7 +2760,7 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
     }
 
     loadAdminData();
-  }, [routeClientSlug, session?.client?.slug, token]);
+  }, [liveCameraId, routeClientSlug, session?.client?.slug, token]);
 
   function logout() {
     saveAdminSession(null);
@@ -2790,6 +2796,7 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
       live_title: camera.live_title || "",
       live_description: camera.live_description || "",
     });
+    setLiveCameraId(camera.id || "");
   }
 
   async function reloadAdminData() {
@@ -2922,14 +2929,20 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
       return;
     }
 
-    const cameraId = cameraForm.id.trim();
-    const cameraName = cameraForm.name.trim();
-    const cameraIp = cameraForm.camera_ip.trim();
+    const liveCamera = selectedLiveCamera;
+    const cameraId = (liveCamera?.id || "").trim();
+    const cameraName = (liveCamera?.name || "").trim();
+    const cameraIp = (liveCamera?.rtsp_url || "").trim();
     const liveTitle = cameraForm.live_title.trim();
     const liveDescription = cameraForm.live_description.trim();
 
-    if (!cameraId || !cameraName || !cameraIp) {
+    if (!cameraId || !cameraName) {
       setMessage("Selecione uma camera cadastrada para controlar a live.");
+      return;
+    }
+
+    if (!cameraIp) {
+      setMessage("A camera selecionada nao tem RTSP cadastrado.");
       return;
     }
 
@@ -3211,31 +3224,19 @@ function AdminTenantPage({ view = "dashboard", routeClientSlug = "" }) {
               </div>
               <form className="tenant-admin-form" onSubmit={(event) => event.preventDefault()}>
                 <label htmlFor="tenantLiveCameraId">ID da camera da live</label>
-                <input
+                <select
                   id="tenantLiveCameraId"
-                  value={cameraForm.id}
-                  onChange={(event) => updateCameraForm("id", event.target.value)}
-                  placeholder="campo-01-camera-01"
+                  value={liveCameraId}
+                  onChange={(event) => setLiveCameraId(event.target.value)}
                   required
-                />
-
-                <label htmlFor="tenantLiveCameraName">Nome da camera</label>
-                <input
-                  id="tenantLiveCameraName"
-                  value={cameraForm.name}
-                  onChange={(event) => updateCameraForm("name", event.target.value)}
-                  placeholder="Campo 1 - Camera 1"
-                  required
-                />
-
-                <label htmlFor="tenantLiveCameraIp">RTSP da camera</label>
-                <input
-                  id="tenantLiveCameraIp"
-                  value={cameraForm.camera_ip}
-                  onChange={(event) => updateCameraForm("camera_ip", event.target.value)}
-                  placeholder="rtsp://10.0.0.142:8554/live"
-                  required
-                />
+                >
+                  {!cameras.length ? <option value="">Nenhuma camera cadastrada</option> : null}
+                  {cameras.map((camera) => (
+                    <option value={camera.id} key={camera.id}>
+                      {camera.id} - {camera.name}
+                    </option>
+                  ))}
+                </select>
 
                 <label htmlFor="tenantCameraLiveTitle">Titulo da live</label>
                 <input
