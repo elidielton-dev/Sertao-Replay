@@ -4378,9 +4378,7 @@ function StreamingPageLite({ clientSlug = "" }) {
         <div className="mb-3 text-sm text-[#c0caad]">{message}</div>
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="overflow-hidden rounded-xl border border-[#8ddc00]/25 bg-black">
-            <div className="mx-auto w-full max-w-[430px]" style={{ aspectRatio: "9 / 16" }}>
-              <video ref={videoRef} autoPlay controls muted playsInline className="h-full w-full bg-black object-cover object-center" />
-            </div>
+            <video ref={videoRef} autoPlay controls playsInline className="aspect-video w-full bg-black object-contain" />
           </div>
 
           <StreamingChatPanel
